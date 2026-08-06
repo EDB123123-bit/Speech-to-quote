@@ -10,6 +10,6 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
   },
   resolve: {
-    alias: { '@': path.resolve(__dirname, './src') },
+    alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
 });

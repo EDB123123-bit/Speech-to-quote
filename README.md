@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Speech-to-quote
 
-## Getting Started
+A Next.js app where Flemish roofworkers record a spoken job description and get back a
+price quote (with line items and VAT) they can review, correct, and finalize as a PDF.
+Voice → Whisper transcription → Claude extraction against the contractor's own price
+catalog → an editable draft quote → a finalized PDF.
 
-First, run the development server:
+## Environment variables
+
+Copy `.env.example` to `.env.local` and fill in:
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (client + server). |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key — used by the browser and by server routes acting as the signed-in contractor (RLS-scoped). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service-role key. Bypasses RLS — used only for writing `pipeline_events` and for the audio-cleanup cron job. Server-only, never expose to the browser. |
+| `OPENAI_API_KEY` | Whisper transcription and TTS. |
+| `ANTHROPIC_API_KEY` | Claude extraction (matching spoken tasks to catalog items). |
+| `EXTRACTION_MODEL` | Claude model id used for extraction, e.g. `claude-sonnet-5`. |
+| `TRANSCRIPTION_MODEL` | Whisper model id, e.g. `whisper-1`. |
+| `TTS_MODEL` | TTS model id, e.g. `gpt-4o-mini-tts`. |
+| `TTS_VOICE` | TTS voice name, e.g. `alloy`. |
+| `CRON_SECRET` | Bearer token required by the audio-cleanup cron route (see below). |
+
+## Database setup
+
+Migrations live in `supabase/migrations/` and cover the schema, RLS policies, and the
+`quote-audio` / `quote-pdfs` storage buckets with their own RLS policies (storage RLS is
+enabled by default with zero permissive policies — the app cannot upload or download
+anything without them).
+
+Apply them to your Supabase project with the Supabase CLI:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+supabase link --project-ref <your-project-ref>
+supabase db push
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+or apply each file's SQL directly via the Supabase SQL editor / MCP `apply_migration` if
+you're not using the CLI. Always apply migrations in filename order.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Running locally
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+Run the test suite with `npm test`, type-check with `npx tsc --noEmit`, and lint with
+`npx eslint`.
 
-To learn more about Next.js, take a look at the following resources:
+## Vercel cron: audio cleanup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`vercel.json` schedules `GET /api/cron/cleanup-audio` daily at 03:00 UTC to delete
+transcribed recordings past their retention window. Vercel calls cron routes with an
+`Authorization: Bearer <CRON_SECRET>` header automatically when `CRON_SECRET` is set as
+a project environment variable in the Vercel dashboard (Project Settings → Environment
+Variables) — set it there for every environment the cron runs in (typically
+Production). The route itself checks that header and returns 401 if it's missing or
+wrong, so the job is a no-op until the secret is configured.

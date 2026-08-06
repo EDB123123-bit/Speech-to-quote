@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireContractor, UnauthorizedError } from '@/lib/auth/require-contractor';
 import { checkFinalizeGate } from '@/lib/quotes/finalize-gate';
-import type { Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
+import { renderQuotePdf } from '@/lib/pdf/render';
+import { logPipelineEvent } from '@/lib/logging/pipeline-events';
+import type { Contractor, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
 export const runtime = 'nodejs';
 
@@ -44,6 +46,36 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   if (error) {
     return NextResponse.json({ error: 'Afwerken mislukt. Probeer opnieuw.' }, { status: 500 });
+  }
+
+  // PDF failure must not undo finalizing — the quote is already correct and
+  // the PDF can be regenerated on demand from the download route.
+  try {
+    const { data: contractor } = await supabase
+      .from('contractors').select('*').eq('id', quote.contractor_id).single();
+
+    const pdf = await renderQuotePdf({
+      contractor: contractor as Contractor,
+      quote: { ...(quote as Quote), status: 'final' },
+      lineItems: (lineItems ?? []) as QuoteLineItem[],
+    });
+
+    const path = `${quote.contractor_id}/${id}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from('quote-pdfs')
+      .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
+    if (uploadError) throw new Error(uploadError.message);
+
+    await supabase.from('quotes').update({ pdf_path: path }).eq('id', id);
+    await logPipelineEvent({
+      quoteId: id, contractorId: quote.contractor_id, step: 'pdf_generate',
+      status: 'success', detail: { path },
+    });
+  } catch (pdfError) {
+    await logPipelineEvent({
+      quoteId: id, contractorId: quote.contractor_id, step: 'pdf_generate',
+      status: 'error', detail: { error: String(pdfError) },
+    });
   }
 
   return NextResponse.json({ ok: true });

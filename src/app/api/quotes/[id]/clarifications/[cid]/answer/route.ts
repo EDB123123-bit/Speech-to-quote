@@ -69,16 +69,24 @@ export async function POST(
     // Apply any work the answer introduced.
     if (outcome.newTasks.length > 0) {
       const rows = expandTasksToLineItems(outcome.newTasks, (catalog ?? []) as CatalogItem[]);
-      await supabase
+      // Offset past the initial extraction's sort_order range so clarification
+      // follow-up lines never collide with the quote's original line items.
+      const { error: insertError } = await supabase
         .from('quote_line_items')
         .insert(rows.map((row) => ({ ...row, quote_id: id, sort_order: 900 + row.sort_order })));
+      if (insertError) throw new Error(`Opslaan van nieuwe offertelijnen mislukt: ${insertError.message}`);
     }
     for (const update of outcome.updatedLineItems) {
       const patch: Record<string, unknown> = {};
       if (update.quantity !== undefined) patch.quantity = update.quantity;
       if (update.unitPriceCents !== undefined) patch.unit_price_cents = update.unitPriceCents;
       if (Object.keys(patch).length > 0) {
-        await supabase.from('quote_line_items').update(patch).eq('id', update.id).eq('quote_id', id);
+        const { error: updateError } = await supabase
+          .from('quote_line_items')
+          .update(patch)
+          .eq('id', update.id)
+          .eq('quote_id', id);
+        if (updateError) throw new Error(`Bijwerken van offertelijn mislukt: ${updateError.message}`);
       }
     }
 
@@ -87,10 +95,14 @@ export async function POST(
         ? outcome.rephrasedQuestionNl
         : clarification.question_nl;
 
-    await supabase
+    const { error: clarificationError } = await supabase
       .from('quote_clarifications')
       .update({ status: state.status, retry_count: state.retryCount, question_nl: question })
-      .eq('id', cid);
+      .eq('id', cid)
+      .eq('quote_id', id);
+    if (clarificationError) {
+      throw new Error(`Bijwerken van vraag mislukt: ${clarificationError.message}`);
+    }
 
     await logPipelineEvent({
       quoteId: id, contractorId, step: 'clarification_answer', status: 'success',

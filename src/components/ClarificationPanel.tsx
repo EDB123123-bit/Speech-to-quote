@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import VoiceRecorder from '@/components/VoiceRecorder';
-import type { QuoteClarification } from '@/lib/supabase/types';
+import type { ClarificationStatus, QuoteClarification } from '@/lib/supabase/types';
 import { dismissClarification } from '@/app/offertes/[id]/clarification-actions';
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
   onResolved: () => void;
 };
 
-type LocalState = { question: string; status: string; capped: boolean };
+type LocalState = { question: string; status: ClarificationStatus; capped: boolean };
 
 export default function ClarificationPanel({ quoteId, clarifications, onResolved }: Props) {
   const [local, setLocal] = useState<Record<string, LocalState>>({});
@@ -75,12 +75,20 @@ export default function ClarificationPanel({ quoteId, clarifications, onResolved
   }
 
   async function dismiss(clarificationId: string) {
-    await dismissClarification(clarificationId);
-    setLocal((prev) => ({
-      ...prev,
-      [clarificationId]: { ...stateOf(clarifications.find((c) => c.id === clarificationId)!), status: 'dismissed' },
-    }));
-    onResolved();
+    const item = clarifications.find((c) => c.id === clarificationId);
+    if (!item) return;
+
+    setError(null);
+    try {
+      await dismissClarification(clarificationId);
+      setLocal((prev) => ({
+        ...prev,
+        [clarificationId]: { ...stateOf(item), status: 'dismissed' },
+      }));
+      onResolved();
+    } catch {
+      setError('Verwijderen mislukt. Probeer opnieuw.');
+    }
   }
 
   if (pending.length === 0) {

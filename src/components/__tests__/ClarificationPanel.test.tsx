@@ -115,6 +115,20 @@ describe('ClarificationPanel', () => {
     await waitFor(() => expect(dismissClarification).toHaveBeenCalledWith('clar-1'));
   });
 
+  it('shows a Dutch error and keeps the question pending when dismiss fails', async () => {
+    dismissClarification.mockRejectedValueOnce(new Error('Bijwerken mislukt. Probeer opnieuw.'));
+    const onResolved = vi.fn();
+
+    render(<ClarificationPanel quoteId="quote-1" clarifications={[clarification()]} onResolved={onResolved} />);
+    await userEvent.click(screen.getByRole('button', { name: /niet van toepassing/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/verwijderen mislukt/i);
+    expect(screen.getByText('Welk type dakpannen wil je gebruiken?')).toBeInTheDocument();
+    expect(screen.getByTestId('pending-count')).toHaveTextContent('1');
+    expect(onResolved).not.toHaveBeenCalled();
+  });
+
   it('says everything is answered when nothing is pending', () => {
     render(
       <ClarificationPanel

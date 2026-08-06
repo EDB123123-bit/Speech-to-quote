@@ -20,6 +20,10 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
   const [lineItems, setLineItems] = useState(initialLineItems);
   const [blockerMessages, setBlockerMessages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  // Set when a line item edit fails to persist to the database. The PDF is
+  // rendered server-side from the DB, so an unsaved edit that the contractor
+  // thinks succeeded must block finalizing rather than fail silently.
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const isFinal = quote.status === 'final';
   const blockers = checkFinalizeGate({ quote, lineItems, clarifications: initialClarifications });
@@ -44,7 +48,9 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
           unit: item.unit,
           unit_price_cents: item.unit_price_cents,
           vat_rate: item.vat_rate,
-        });
+        })
+          .then(() => setSaveFailed(false))
+          .catch(() => setSaveFailed(true));
       }
     }
   }
@@ -97,14 +103,28 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              onClick={() => void addLineItem(quote.id, 'materials').then(() => router.refresh())}
+              onClick={() =>
+                void addLineItem(quote.id, 'materials')
+                  .then(() => {
+                    setSaveFailed(false);
+                    router.refresh();
+                  })
+                  .catch(() => setSaveFailed(true))
+              }
               className="rounded border px-3 py-2 text-sm"
             >
               + Materiaal toevoegen
             </button>
             <button
               type="button"
-              onClick={() => void addLineItem(quote.id, 'labor').then(() => router.refresh())}
+              onClick={() =>
+                void addLineItem(quote.id, 'labor')
+                  .then(() => {
+                    setSaveFailed(false);
+                    router.refresh();
+                  })
+                  .catch(() => setSaveFailed(true))
+              }
               className="rounded border px-3 py-2 text-sm"
             >
               + Arbeid toevoegen
@@ -114,6 +134,12 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
       </section>
 
       {!isFinal && <CustomerForm quote={quote} />}
+
+      {saveFailed && (
+        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          Een offertelijn kon niet opgeslagen worden. Controleer je verbinding en probeer opnieuw.
+        </p>
+      )}
 
       {blockerMessages.length > 0 && (
         <ul role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
@@ -134,7 +160,7 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
         <button
           type="button"
           onClick={() => void finalize()}
-          disabled={busy || blockers.length > 0}
+          disabled={busy || blockers.length > 0 || saveFailed}
           className="rounded bg-black p-4 text-white disabled:opacity-50"
         >
           {busy ? 'Bezig…' : 'Offerte afwerken'}

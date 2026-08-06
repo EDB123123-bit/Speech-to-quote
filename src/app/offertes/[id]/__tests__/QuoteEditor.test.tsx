@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import QuoteEditor from '@/app/offertes/[id]/QuoteEditor';
+import { updateLineItem, addLineItem } from '@/app/offertes/[id]/line-item-actions';
 import type { Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
@@ -104,5 +105,31 @@ describe('QuoteEditor', () => {
       <QuoteEditor quote={{ ...quote, status: 'final' }} initialLineItems={[line()]} initialClarifications={[]} />,
     );
     expect(screen.getByDisplayValue('Dakpannen leggen – materiaal')).toBeDisabled();
+  });
+
+  it('shows a save-failure alert and blocks finalizing when a line item edit fails to persist', async () => {
+    (updateLineItem as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'));
+
+    render(<QuoteEditor quote={quote} initialLineItems={[line()]} initialClarifications={[]} />);
+
+    fireEvent.change(screen.getByDisplayValue('Dakpannen leggen – materiaal'), {
+      target: { value: 'Dakpannen leggen – materiaal (herzien)' },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText(/kon niet opgeslagen worden/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /offerte afwerken/i })).toBeDisabled();
+  });
+
+  it('shows a save-failure alert when adding a line item fails to persist', async () => {
+    (addLineItem as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'));
+
+    render(<QuoteEditor quote={quote} initialLineItems={[line()]} initialClarifications={[]} />);
+    await userEvent.click(screen.getByRole('button', { name: /materiaal toevoegen/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/kon niet opgeslagen worden/i)).toBeInTheDocument(),
+    );
   });
 });

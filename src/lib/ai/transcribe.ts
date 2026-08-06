@@ -19,7 +19,7 @@ export async function transcribeAudio(audio: File): Promise<string> {
       language: 'nl',
     });
     text = (result.text ?? '').trim();
-  } catch (error: unknown) {
+  } catch (error) {
     throw new TranscriptionError('Transcriptie mislukt', { cause: error });
   }
 

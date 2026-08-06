@@ -71,7 +71,18 @@ export async function generateQuote(
     throw error;
   }
 
-  await deps.saveTranscript(quoteId, transcript);
+  // Not a distinct pipeline step in its own right — logged under 'transcribe'
+  // (with a phase marker) since it persists that step's output and shares
+  // its PipelineStep enum value rather than adding a new DB-level step.
+  try {
+    await deps.saveTranscript(quoteId, transcript);
+  } catch (error) {
+    await deps.log({
+      quoteId, contractorId, step: 'transcribe', status: 'error',
+      detail: { phase: 'save_transcript', error: String(error) },
+    });
+    throw error;
+  }
 
   // --- extract ------------------------------------------------------------
   let extraction: ExtractionResult;

@@ -53,7 +53,8 @@ export async function POST(request: Request) {
     transcribe: transcribeAudio,
     extract: extractQuoteTasks,
     saveTranscript: async (quoteId, transcript) => {
-      await supabase.from('quotes').update({ transcript }).eq('id', quoteId);
+      const { error } = await supabase.from('quotes').update({ transcript }).eq('id', quoteId);
+      if (error) throw new Error('Opslaan van transcript mislukt');
     },
     saveLineItems: async (quoteId, rows) => {
       if (rows.length === 0) return;

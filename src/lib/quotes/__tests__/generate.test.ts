@@ -92,6 +92,22 @@ describe('generateQuote', () => {
     expect(errorLogs.some((e) => e.step === 'transcribe')).toBe(true);
   });
 
+  it('logs an error event and rethrows when saving the transcript fails', async () => {
+    const deps = makeDeps({
+      saveTranscript: vi.fn().mockRejectedValue(new Error('Opslaan van transcript mislukt')),
+    });
+
+    await expect(generateQuote(deps, { audio: audio(), contractorId: 'c1' })).rejects.toThrow(
+      'Opslaan van transcript mislukt',
+    );
+
+    const errorLogs = deps.log.mock.calls
+      .map((call) => call[0] as { step: string; status: string })
+      .filter((event) => event.status === 'error');
+    expect(errorLogs.some((e) => e.step === 'transcribe')).toBe(true);
+    expect(deps.extract).not.toHaveBeenCalled();
+  });
+
   it('keeps the draft quote when extraction fails, so the contractor can fill it in manually', async () => {
     const deps = makeDeps({
       extract: vi.fn().mockRejectedValue(new ExtractionError('kapot')),

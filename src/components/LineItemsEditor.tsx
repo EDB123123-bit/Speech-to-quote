@@ -45,11 +45,10 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                 <label className="flex flex-col gap-1 text-xs">
                   Aantal
                   <input
-                    key={item.id}
                     aria-label={`Aantal voor ${item.description}`}
                     type="number"
                     step="any"
-                    defaultValue={item.quantity}
+                    value={item.quantity}
                     disabled={readOnly}
                     onChange={(e) => patch(item.id, { quantity: Number(e.target.value) })}
                     className="rounded border p-2"

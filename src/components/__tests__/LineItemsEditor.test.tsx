@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -20,6 +21,31 @@ function item(overrides: Partial<QuoteLineItem> = {}): QuoteLineItem {
     created_at: '2026-08-06T00:00:00Z',
     ...overrides,
   };
+}
+
+// LineItemsEditor's inputs are genuinely controlled: they show `items` as
+// passed in via props, and rely on the parent re-rendering with the patched
+// array on every change (exactly like the real QuoteEditor parent will).
+// A bare `onChange={vi.fn()}` never feeds that update back in, so a
+// controlled input would appear to "reject" keystrokes typed after the
+// first one — this wrapper closes the loop the way production code does.
+function StatefulWrapper({
+  initialItems,
+  onChange,
+}: {
+  initialItems: QuoteLineItem[];
+  onChange: (items: QuoteLineItem[]) => void;
+}) {
+  const [items, setItems] = useState(initialItems);
+  return (
+    <LineItemsEditor
+      items={items}
+      onChange={(next) => {
+        setItems(next);
+        onChange(next);
+      }}
+    />
+  );
 }
 
 describe('toTotalsInput', () => {
@@ -61,11 +87,16 @@ describe('LineItemsEditor', () => {
 
   it('reports a changed quantity', async () => {
     const onChange = vi.fn();
-    render(<LineItemsEditor items={[item()]} onChange={onChange} />);
+    render(<StatefulWrapper initialItems={[item()]} onChange={onChange} />);
 
     const input = screen.getByLabelText(/aantal/i);
     await userEvent.clear(input);
     await userEvent.type(input, '90');
+
+    // The visible input must actually accumulate the typed digits — this is
+    // what proves the component is genuinely controlled, not a coincidental
+    // pass on the final onChange payload alone.
+    expect(input).toHaveValue(90);
 
     expect(onChange).toHaveBeenCalled();
     const last = onChange.mock.calls.at(-1)![0];

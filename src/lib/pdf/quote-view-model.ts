@@ -1,0 +1,76 @@
+import { calculateTotals, formatEuros, toTotalsInput, type QuoteTotals } from '@/lib/money/totals';
+import type { Contractor, Quote, QuoteLineItem } from '@/lib/supabase/types';
+
+export type QuoteRow = {
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPrice: string;
+  vatLabel: string;
+  lineTotal: string;
+};
+
+export type QuoteViewModel = {
+  contractor: { companyName: string; address: string; vatNumber: string; phone: string };
+  customer: { name: string; address: string; email: string; phone: string };
+  quoteNumber: string;
+  dateNl: string;
+  groups: { title: string; rows: QuoteRow[] }[];
+  totals: QuoteTotals;
+  showsReducedVatNotice: boolean;
+};
+
+/** "Dakpannen leggen – materiaal" -> "Dakpannen leggen" */
+function taskTitle(description: string): string {
+  return description.replace(/\s+–\s+(materiaal|arbeid)$/u, '').trim();
+}
+
+export function buildQuoteViewModel(args: {
+  contractor: Contractor;
+  quote: Quote;
+  lineItems: QuoteLineItem[];
+}): QuoteViewModel {
+  const { contractor, quote, lineItems } = args;
+
+  const grouped = new Map<string, QuoteRow[]>();
+  for (const item of [...lineItems].sort((a, b) => a.sort_order - b.sort_order)) {
+    const title = taskTitle(item.description);
+    const rows = grouped.get(title) ?? [];
+    const unitPriceCents = item.unit_price_cents ?? 0;
+
+    rows.push({
+      description: item.line_type === 'materials' ? 'Materiaal' : 'Arbeid',
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPrice: formatEuros(unitPriceCents),
+      vatLabel: item.vat_rate === 0.06 ? '6%' : '21%',
+      lineTotal: formatEuros(Math.round(item.quantity * unitPriceCents)),
+    });
+    grouped.set(title, rows);
+  }
+
+  const created = new Date(quote.created_at);
+  const dateNl = `${String(created.getUTCDate()).padStart(2, '0')}/${String(
+    created.getUTCMonth() + 1,
+  ).padStart(2, '0')}/${created.getUTCFullYear()}`;
+
+  return {
+    contractor: {
+      companyName: contractor.company_name,
+      address: contractor.address ?? '',
+      vatNumber: contractor.vat_number ?? '',
+      phone: contractor.phone ?? '',
+    },
+    customer: {
+      name: quote.customer_name ?? '',
+      address: quote.customer_address ?? '',
+      email: quote.customer_email ?? '',
+      phone: quote.customer_phone ?? '',
+    },
+    quoteNumber: quote.id.split('-')[0].toUpperCase(),
+    dateNl,
+    groups: [...grouped.entries()].map(([title, rows]) => ({ title, rows })),
+    totals: calculateTotals(toTotalsInput(lineItems)),
+    showsReducedVatNotice: lineItems.some((item) => item.vat_rate === 0.06),
+  };
+}

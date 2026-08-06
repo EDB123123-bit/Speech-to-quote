@@ -1,10 +1,20 @@
-import { VAT_RATES, type VatRate } from '@/lib/supabase/types';
+import { VAT_RATES, type QuoteLineItem, type VatRate } from '@/lib/supabase/types';
 
 export type TotalsLineItem = {
   quantity: number;
   unitPriceCents: number;
   vatRate: VatRate;
 };
+
+export function toTotalsInput(items: QuoteLineItem[]): TotalsLineItem[] {
+  return items
+    .filter((item) => item.unit_price_cents !== null && item.vat_rate !== null)
+    .map((item) => ({
+      quantity: item.quantity,
+      unitPriceCents: item.unit_price_cents as number,
+      vatRate: item.vat_rate as VatRate,
+    }));
+}
 
 export type VatGroup = {
   vatRate: VatRate;

@@ -1,17 +1,9 @@
 'use client';
 
 import type { QuoteLineItem, VatRate } from '@/lib/supabase/types';
-import { calculateTotals, formatEuros, type TotalsLineItem } from '@/lib/money/totals';
+import { calculateTotals, formatEuros, toTotalsInput } from '@/lib/money/totals';
 
-export function toTotalsInput(items: QuoteLineItem[]): TotalsLineItem[] {
-  return items
-    .filter((item) => item.unit_price_cents !== null && item.vat_rate !== null)
-    .map((item) => ({
-      quantity: item.quantity,
-      unitPriceCents: item.unit_price_cents as number,
-      vatRate: item.vat_rate as VatRate,
-    }));
-}
+export { toTotalsInput };
 
 type Props = {
   items: QuoteLineItem[];

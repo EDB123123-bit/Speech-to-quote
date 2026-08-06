@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/cleanup-audio", "schedule": "0 3 * * *" }
+  ]
+}

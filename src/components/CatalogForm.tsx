@@ -7,6 +7,7 @@ import { createCatalogItem, deleteCatalogItem } from '@/app/instellingen/catalog
 
 export default function CatalogForm({ items }: { items: CatalogItem[] }) {
   const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function action(form: FormData) {
     setError(null);
@@ -14,6 +15,15 @@ export default function CatalogForm({ items }: { items: CatalogItem[] }) {
       await createCatalogItem(form);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Opslaan mislukt.');
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setDeleteError(null);
+    try {
+      await deleteCatalogItem(id);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Verwijderen mislukt. Probeer opnieuw.');
     }
   }
 
@@ -35,7 +45,7 @@ export default function CatalogForm({ items }: { items: CatalogItem[] }) {
               </p>
             </div>
             <button
-              onClick={() => deleteCatalogItem(item.id)}
+              onClick={() => handleDelete(item.id)}
               className="text-sm text-red-600 underline"
               aria-label={`Verwijder ${item.name}`}
             >
@@ -44,6 +54,7 @@ export default function CatalogForm({ items }: { items: CatalogItem[] }) {
           </li>
         ))}
       </ul>
+      {deleteError && <p role="alert" className="text-sm text-red-600">{deleteError}</p>}
 
       <form action={action} className="flex flex-col gap-3 rounded border p-4">
         <h3 className="font-semibold">Nieuw item toevoegen</h3>

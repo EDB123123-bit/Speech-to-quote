@@ -46,7 +46,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
       if (uploadError) throw new Error(uploadError.message);
 
-      await supabase.from('quotes').update({ pdf_path: path }).eq('id', id);
+      const { error: pdfPathError } = await supabase
+        .from('quotes')
+        .update({ pdf_path: path })
+        .eq('id', id);
+      if (pdfPathError) throw new Error(pdfPathError.message);
+
       await logPipelineEvent({
         quoteId: id, contractorId: contractor.id, step: 'pdf_generate',
         status: 'success', detail: { path, regenerated: true },

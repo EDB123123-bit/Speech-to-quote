@@ -26,6 +26,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data: quote } = await supabase.from('quotes').select('*').eq('id', id).single();
   if (!quote) return NextResponse.json({ error: 'Offerte niet gevonden' }, { status: 404 });
 
+  // Only finalized quotes may ever be downloaded here. Rendering a draft
+  // would persist its (possibly unpriced) PDF as pdf_path, which a later
+  // finalize whose own PDF step fails would then serve as if it were final.
+  if ((quote as Quote).status !== 'final') {
+    return NextResponse.json({ error: 'Deze offerte is nog niet afgewerkt.' }, { status: 409 });
+  }
+
   let path = (quote as Quote).pdf_path;
 
   // Regenerate on demand when finalizing produced no PDF.

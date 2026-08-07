@@ -47,7 +47,7 @@ export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: bool
   return (
     <div className="flex flex-col gap-4">
       {!hasCatalogItems && (
-        <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-4 text-sm">
+        <p role="alert" className="alert alert-warning">
           Stel eerst je prijslijst in bij Instellingen. Zonder prijzen kan er geen offerte gemaakt worden.
         </p>
       )}
@@ -58,16 +58,16 @@ export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: bool
         disabled={!hasCatalogItems || status === 'uploading'}
       />
 
-      {status === 'uploading' && <p className="text-sm text-gray-600">Bezig met verwerken…</p>}
+      {status === 'uploading' && <p className="text-sm text-muted">Bezig met verwerken…</p>}
 
       {status === 'error' && (
         <div className="flex flex-col gap-2">
-          <p role="alert" className="text-sm text-red-600">{error}</p>
+          <p role="alert" className="alert alert-critical">{error}</p>
           {lastRecording && (
             <button
               type="button"
               onClick={() => void upload(lastRecording)}
-              className="rounded border p-3"
+              className="btn btn-outline"
             >
               Opnieuw proberen
             </button>

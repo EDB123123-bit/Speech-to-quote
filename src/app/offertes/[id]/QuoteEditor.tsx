@@ -81,9 +81,9 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
   return (
     <div className="flex flex-col gap-6">
       {quote.transcript && (
-        <details className="rounded border p-3 text-sm">
-          <summary className="cursor-pointer font-medium">Wat ik gehoord heb</summary>
-          <p className="mt-2 text-gray-700">{quote.transcript}</p>
+        <details className="card text-sm">
+          <summary className="cursor-pointer font-medium text-muted">Wat ik gehoord heb</summary>
+          <p className="mt-3 text-ink">{quote.transcript}</p>
         </details>
       )}
 
@@ -111,7 +111,7 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
                   })
                   .catch(() => setSaveFailed(true))
               }
-              className="rounded border px-3 py-2 text-sm"
+              className="btn btn-outline"
             >
               + Materiaal toevoegen
             </button>
@@ -125,7 +125,7 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
                   })
                   .catch(() => setSaveFailed(true))
               }
-              className="rounded border px-3 py-2 text-sm"
+              className="btn btn-outline"
             >
               + Arbeid toevoegen
             </button>
@@ -136,13 +136,13 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
       {!isFinal && <CustomerForm quote={quote} />}
 
       {saveFailed && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <p role="alert" className="alert alert-critical">
           Een offertelijn kon niet opgeslagen worden. Controleer je verbinding en probeer opnieuw.
         </p>
       )}
 
       {blockerMessages.length > 0 && (
-        <ul role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <ul role="alert" className="alert alert-critical flex-col">
           {blockerMessages.map((message) => (
             <li key={message}>{message}</li>
           ))}
@@ -152,7 +152,7 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
       {isFinal ? (
         <a
           href={`/api/quotes/${quote.id}/pdf`}
-          className="rounded bg-black p-4 text-center text-white"
+          className="btn btn-accent w-full"
         >
           Pdf downloaden
         </a>
@@ -161,14 +161,14 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
           type="button"
           onClick={() => void finalize()}
           disabled={busy || blockers.length > 0 || saveFailed}
-          className="rounded bg-black p-4 text-white disabled:opacity-50"
+          className="btn btn-primary w-full"
         >
           {busy ? 'Bezig…' : 'Offerte afwerken'}
         </button>
       )}
 
       {!isFinal && blockers.length > 0 && (
-        <ul className="text-sm text-gray-600">
+        <ul className="text-sm text-muted">
           {blockers.map((blocker) => (
             <li key={blocker.code}>• {blocker.messageNl}</li>
           ))}

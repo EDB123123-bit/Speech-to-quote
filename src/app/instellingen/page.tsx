@@ -12,19 +12,19 @@ export default async function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-2xl p-6">
-      <h1 className="mb-6 text-2xl font-bold">Instellingen</h1>
+      <h1 className="mb-8 text-3xl font-semibold">Instellingen</h1>
 
       <section className="mb-10">
-        <h2 className="mb-3 text-lg font-semibold">Bedrijfsgegevens</h2>
-        <p className="mb-4 text-sm text-gray-600">
+        <h2 className="mb-2 text-lg font-semibold">Bedrijfsgegevens</h2>
+        <p className="mb-4 text-sm text-muted">
           Deze gegevens verschijnen op elke offerte die je genereert.
         </p>
         <ProfileForm contractor={contractor} />
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Prijslijst</h2>
-        <p className="mb-4 text-sm text-gray-600">
+        <h2 className="mb-2 text-lg font-semibold">Prijslijst</h2>
+        <p className="mb-4 text-sm text-muted">
           Je eigen prijzen. Deze worden gebruikt om je gesproken beschrijving om te zetten in een offerte.
         </p>
         <CatalogForm items={(data ?? []) as CatalogItem[]} />

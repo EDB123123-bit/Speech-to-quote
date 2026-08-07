@@ -24,17 +24,20 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
         {items.map((item) => {
           const incomplete = item.unit_price_cents === null || item.vat_rate === null;
           return (
-            <li key={item.id} className={`rounded border p-3 ${incomplete ? 'border-amber-400 bg-amber-50' : ''}`}>
+            <li
+              key={item.id}
+              className={`card ${incomplete ? 'border-warning bg-warning-bg/40' : ''}`}
+            >
               <input
                 aria-label="Omschrijving"
                 value={item.description}
                 disabled={readOnly}
                 onChange={(e) => patch(item.id, { description: e.target.value })}
-                className="mb-2 w-full rounded border p-2"
+                className="field mb-3 font-medium"
               />
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <label className="flex flex-col gap-1 text-xs">
+                <label className="label flex flex-col gap-1">
                   Aantal
                   <input
                     aria-label={`Aantal voor ${item.description}`}
@@ -43,22 +46,22 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                     value={item.quantity}
                     disabled={readOnly}
                     onChange={(e) => patch(item.id, { quantity: Number(e.target.value) })}
-                    className="rounded border p-2"
+                    className="field nums text-ink"
                   />
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs">
+                <label className="label flex flex-col gap-1">
                   Eenheid
                   <input
                     aria-label={`Eenheid voor ${item.description}`}
                     value={item.unit}
                     disabled={readOnly}
                     onChange={(e) => patch(item.id, { unit: e.target.value })}
-                    className="rounded border p-2"
+                    className="field text-ink"
                   />
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs">
+                <label className="label flex flex-col gap-1">
                   Prijs per eenheid (€)
                   <input
                     aria-label={`Prijs voor ${item.description}`}
@@ -72,11 +75,11 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                           e.target.value === '' ? null : Math.round(Number(e.target.value) * 100),
                       })
                     }
-                    className="rounded border p-2"
+                    className="field nums text-ink"
                   />
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs">
+                <label className="label flex flex-col gap-1">
                   Btw
                   <select
                     aria-label={`Btw-tarief voor ${item.description}`}
@@ -87,7 +90,7 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                         vat_rate: e.target.value === '' ? null : (Number(e.target.value) as VatRate),
                       })
                     }
-                    className="rounded border p-2"
+                    className="field nums text-ink"
                   >
                     <option value="">Kies…</option>
                     <option value="0.06">6%</option>
@@ -97,7 +100,7 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
               </div>
 
               {incomplete && (
-                <p className="mt-2 text-xs text-amber-800">
+                <p className="mt-3 text-xs font-medium text-warning">
                   Vul prijs en btw-tarief aan voordat je de offerte afwerkt.
                 </p>
               )}
@@ -106,10 +109,10 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
         })}
       </ul>
 
-      <div className="rounded border p-4">
+      <div className="card nums">
         {totals.vatGroups.map((group) => (
-          <div key={group.vatRate} data-testid={`vat-group-${group.vatRate}`} className="flex justify-between text-sm">
-            <span>
+          <div key={group.vatRate} data-testid={`vat-group-${group.vatRate}`} className="flex justify-between py-1 text-sm text-muted">
+            <span className="font-sans">
               Subtotaal {group.vatRate === 0.06 ? '6%' : '21%'} btw
             </span>
             <span>
@@ -117,9 +120,11 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
             </span>
           </div>
         ))}
-        <div className="mt-2 flex justify-between border-t pt-2 font-bold">
-          <span>Totaal incl. btw</span>
-          <span data-testid="grand-total">{formatEuros(totals.grandTotalCents)}</span>
+        <div className="mt-2 flex items-baseline justify-between border-t border-border pt-3">
+          <span className="font-sans text-base font-semibold">Totaal incl. btw</span>
+          <span data-testid="grand-total" className="font-display text-2xl font-semibold">
+            {formatEuros(totals.grandTotalCents)}
+          </span>
         </div>
       </div>
     </div>

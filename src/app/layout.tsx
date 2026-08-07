@@ -1,6 +1,26 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { Fraunces, Work_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-fraunces',
+  weight: ['500', '600'],
+  display: 'swap',
+});
+const workSans = Work_Sans({
+  subsets: ['latin'],
+  variable: '--font-work-sans',
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  variable: '--font-plex-mono',
+  weight: ['400', '500'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Offertes',
@@ -9,13 +29,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="nl">
+    <html lang="nl" className={`${fraunces.variable} ${workSans.variable} ${plexMono.variable}`}>
       <body>
-        <nav className="border-b">
-          <div className="mx-auto flex max-w-2xl gap-4 p-4 text-sm">
-            <Link href="/offertes" className="font-medium">Offertes</Link>
-            <Link href="/offertes/nieuw">Nieuwe offerte</Link>
-            <Link href="/instellingen" className="ml-auto">Instellingen</Link>
+        <nav className="border-b border-border bg-surface">
+          <div className="mx-auto flex max-w-2xl items-center gap-6 p-4 text-sm">
+            <Link href="/offertes" className="font-semibold text-ink hover:text-accent">
+              Offertes
+            </Link>
+            <Link href="/offertes/nieuw" className="text-muted hover:text-accent">
+              Nieuwe offerte
+            </Link>
+            <Link href="/instellingen" className="ml-auto text-muted hover:text-accent">
+              Instellingen
+            </Link>
           </div>
         </nav>
         {children}

@@ -17,12 +17,12 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   return (
     <main className="mx-auto max-w-2xl p-6">
-      <h1 className="mb-1 text-2xl font-bold">
+      <h1 className="mb-2 text-3xl font-semibold">
         Offerte {(quote as Quote).id.split('-')[0].toUpperCase()}
       </h1>
-      <p className="mb-6 text-sm text-gray-600">
+      <span className={`badge mb-6 inline-flex ${(quote as Quote).status === 'final' ? 'badge-success' : 'badge-neutral'}`}>
         {(quote as Quote).status === 'final' ? 'Afgewerkt' : 'Concept'}
-      </p>
+      </span>
 
       <QuoteEditor
         quote={quote as Quote}

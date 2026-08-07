@@ -19,6 +19,12 @@ export class PartialQuoteError extends Error {
   }
 }
 
+/** Surfaces `error.cause` too — the underlying SDK/API error is otherwise swallowed in logs. */
+function errorDetail(error: unknown): { error: string; cause?: string } {
+  const cause = error instanceof Error && error.cause instanceof Error ? String(error.cause) : undefined;
+  return cause ? { error: String(error), cause } : { error: String(error) };
+}
+
 export type GenerateDeps = {
   loadCatalog: (contractorId: string) => Promise<CatalogItem[]>;
   uploadAudio: (contractorId: string, audio: File) => Promise<string>;
@@ -52,7 +58,7 @@ export async function generateQuote(
     audioPath = await deps.uploadAudio(contractorId, audio);
     await deps.log({ quoteId: null, contractorId, step: 'upload', status: 'success', detail: { audioPath } });
   } catch (error) {
-    await deps.log({ quoteId: null, contractorId, step: 'upload', status: 'error', detail: { error: String(error) } });
+    await deps.log({ quoteId: null, contractorId, step: 'upload', status: 'error', detail: errorDetail(error) });
     throw error;
   }
 
@@ -67,7 +73,7 @@ export async function generateQuote(
       detail: { transcriptLength: transcript.length, transcript },
     });
   } catch (error) {
-    await deps.log({ quoteId, contractorId, step: 'transcribe', status: 'error', detail: { error: String(error) } });
+    await deps.log({ quoteId, contractorId, step: 'transcribe', status: 'error', detail: errorDetail(error) });
     throw error;
   }
 
@@ -79,7 +85,7 @@ export async function generateQuote(
   } catch (error) {
     await deps.log({
       quoteId, contractorId, step: 'transcribe', status: 'error',
-      detail: { phase: 'save_transcript', error: String(error) },
+      detail: { phase: 'save_transcript', ...errorDetail(error) },
     });
     throw error;
   }
@@ -93,7 +99,7 @@ export async function generateQuote(
       detail: { taskCount: extraction.tasks.length, clarificationCount: extraction.clarifications.length },
     });
   } catch (error) {
-    await deps.log({ quoteId, contractorId, step: 'extract', status: 'error', detail: { error: String(error) } });
+    await deps.log({ quoteId, contractorId, step: 'extract', status: 'error', detail: errorDetail(error) });
     // The draft survives: the contractor can still build the quote by hand
     // rather than losing the recording they just made.
     throw new PartialQuoteError('Automatische verwerking mislukt', quoteId, { cause: error });

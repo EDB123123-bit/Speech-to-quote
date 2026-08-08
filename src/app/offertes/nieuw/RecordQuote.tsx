@@ -52,11 +52,13 @@ export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: bool
         </p>
       )}
 
-      <VoiceRecorder
-        onRecorded={onRecorded}
-        label="Beschrijf de klus"
-        disabled={!hasCatalogItems || status === 'uploading'}
-      />
+      <div data-tour="record-button">
+        <VoiceRecorder
+          onRecorded={onRecorded}
+          label="Beschrijf de klus"
+          disabled={!hasCatalogItems || status === 'uploading'}
+        />
+      </div>
 
       {status === 'uploading' && <p className="text-sm text-muted">Bezig met verwerken…</p>}
 

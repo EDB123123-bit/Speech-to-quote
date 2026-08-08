@@ -56,7 +56,7 @@ export default function CatalogForm({ items }: { items: CatalogItem[] }) {
       </ul>
       {deleteError && <p role="alert" className="alert alert-critical">{deleteError}</p>}
 
-      <form action={action} className="card flex flex-col gap-3">
+      <form action={action} data-tour="catalog-form" className="card flex flex-col gap-3">
         <h3 className="font-semibold">Nieuw item toevoegen</h3>
         <input name="name" required placeholder="Omschrijving (bv. Dakpannen leggen)" className="field" />
         <input name="unit" required placeholder="Eenheid (bv. m², stuk, uur)" className="field" />

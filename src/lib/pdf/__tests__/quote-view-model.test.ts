@@ -4,7 +4,8 @@ import type { Contractor, Quote, QuoteLineItem } from '@/lib/supabase/types';
 
 const contractor: Contractor = {
   id: 'c1', company_name: 'Dakwerken Janssens', address: 'Kerkstraat 1, 9000 Gent',
-  vat_number: 'BE0123456789', phone: '0470123456', created_at: '2026-01-01T00:00:00Z',
+  vat_number: 'BE0123456789', phone: '0470123456', onboarding_completed_at: null,
+  created_at: '2026-01-01T00:00:00Z',
 };
 
 const quote: Quote = {

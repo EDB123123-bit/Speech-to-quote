@@ -23,6 +23,7 @@ export type Contractor = {
   address: string | null;
   vat_number: string | null;
   phone: string | null;
+  onboarding_completed_at: string | null;
   created_at: string;
 };
 

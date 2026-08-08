@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Fraunces, Work_Sans, IBM_Plex_Mono } from 'next/font/google';
 import OnboardingTour from '@/components/onboarding/OnboardingTour';
+import LogoutButton from '@/components/LogoutButton';
 import './globals.css';
 
 const fraunces = Fraunces({
@@ -40,9 +41,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/offertes/nieuw" data-tour="nav-nieuwe-offerte" className="text-muted hover:text-accent">
               Nieuwe offerte
             </Link>
-            <Link href="/instellingen" data-tour="nav-instellingen" className="ml-auto text-muted hover:text-accent">
-              Instellingen
-            </Link>
+            <div className="ml-auto flex items-center gap-4">
+              <Link href="/instellingen" data-tour="nav-instellingen" className="text-muted hover:text-accent">
+                Instellingen
+              </Link>
+              <LogoutButton />
+            </div>
           </div>
         </nav>
         {children}

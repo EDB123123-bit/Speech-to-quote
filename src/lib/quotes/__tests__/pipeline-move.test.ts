@@ -90,6 +90,15 @@ describe('movePipelineStage', () => {
     expect(deps.finalizeDeps.updateStatusToFinal).toHaveBeenCalledWith('q1');
   });
 
+  it('returns DB error message when updateStatusToFinal fails during finalization', async () => {
+    const finalizeDeps = makeDeps().finalizeDeps;
+    finalizeDeps.updateStatusToFinal = vi.fn().mockRejectedValue(new Error('DB write failed'));
+    const deps = makeDeps({ finalizeDeps });
+
+    const result = await movePipelineStage(deps, 'q1', { type: 'afgewerkt' }, 'c1');
+    expect(result).toEqual({ ok: false, error: 'Afwerken mislukt. Probeer opnieuw.' });
+  });
+
   it('sets pipeline_stage_id to null for final -> afgewerkt', async () => {
     const deps = makeDeps({ loadQuote: vi.fn().mockResolvedValue(finalQuote) });
     const result = await movePipelineStage(deps, 'q1', { type: 'afgewerkt' }, 'c1');

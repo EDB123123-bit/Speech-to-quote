@@ -38,6 +38,14 @@ export type CatalogItem = {
   created_at: string;
 };
 
+export type PipelineStage = {
+  id: string;
+  contractor_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+};
+
 export type Quote = {
   id: string;
   contractor_id: string;
@@ -50,6 +58,7 @@ export type Quote = {
   audio_path: string | null;
   audio_deleted_at: string | null;
   pdf_path: string | null;
+  pipeline_stage_id: string | null;
   created_at: string;
 };
 

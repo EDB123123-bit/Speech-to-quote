@@ -23,7 +23,7 @@ const quote: Quote = {
   id: 'quote-1', contractor_id: 'c1', transcript: 'tachtig vierkante meter dakpannen',
   status: 'draft', customer_name: 'Jan Peeters', customer_address: 'Dorpsstraat 5',
   customer_email: null, customer_phone: null, audio_path: null, audio_deleted_at: null,
-  pdf_path: null, created_at: '2026-08-06T10:00:00Z',
+  pdf_path: null, pipeline_stage_id: null, created_at: '2026-08-06T10:00:00Z',
 };
 
 function line(overrides: Partial<QuoteLineItem> = {}): QuoteLineItem {

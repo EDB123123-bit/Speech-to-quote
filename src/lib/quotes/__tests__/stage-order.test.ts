@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextSortOrder, canDeleteStage, swapSortOrder } from '@/lib/quotes/stage-order';
+import { nextSortOrder, canDeleteStage, swapSortOrder, revertSwap } from '@/lib/quotes/stage-order';
 
 describe('nextSortOrder', () => {
   it('returns 0 for an empty list', () => {
@@ -47,5 +47,38 @@ describe('swapSortOrder', () => {
   it('returns null when there is no neighbor in that direction', () => {
     expect(swapSortOrder(stages, 'a', 'up')).toBeNull();
     expect(swapSortOrder(stages, 'c', 'down')).toBeNull();
+  });
+});
+
+describe('revertSwap', () => {
+  const original = [
+    { id: 'a', sort_order: 0 },
+    { id: 'b', sort_order: 1 },
+    { id: 'c', sort_order: 2 },
+  ];
+
+  it('maps applied rows back to their original sort_order', () => {
+    const applied = [{ id: 'a', sort_order: 1 }];
+    expect(revertSwap(original, applied)).toEqual([{ id: 'a', sort_order: 0 }]);
+  });
+
+  it('reverts multiple applied rows in order', () => {
+    const applied = [
+      { id: 'a', sort_order: 1 },
+      { id: 'b', sort_order: 0 },
+    ];
+    expect(revertSwap(original, applied)).toEqual([
+      { id: 'a', sort_order: 0 },
+      { id: 'b', sort_order: 1 },
+    ]);
+  });
+
+  it('returns an empty array when nothing was applied yet', () => {
+    expect(revertSwap(original, [])).toEqual([]);
+  });
+
+  it('drops applied rows with no known original value', () => {
+    const applied = [{ id: 'unknown', sort_order: 5 }];
+    expect(revertSwap(original, applied)).toEqual([]);
   });
 });

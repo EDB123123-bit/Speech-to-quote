@@ -35,3 +35,24 @@ export function swapSortOrder(
     { id: neighbor.id, sort_order: current.sort_order },
   ];
 }
+
+/**
+ * Given the pre-swap stages and the subset of a swap that was already
+ * persisted before a later step failed, computes the updates needed to put
+ * those rows back to their original sort_order — best-effort compensation
+ * for a partially-applied two-row swap. Items with no known original value
+ * are dropped rather than guessed at.
+ */
+export function revertSwap(
+  original: IdentifiedItem[],
+  applied: IdentifiedItem[],
+): IdentifiedItem[] {
+  const originalById = new Map(original.map((s) => [s.id, s.sort_order]));
+  const result: IdentifiedItem[] = [];
+  for (const item of applied) {
+    const sort_order = originalById.get(item.id);
+    if (sort_order === undefined) continue;
+    result.push({ id: item.id, sort_order });
+  }
+  return result;
+}

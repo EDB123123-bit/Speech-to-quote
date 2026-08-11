@@ -50,6 +50,27 @@ describe('finalizeQuote', () => {
     expect(deps.renderPdf).not.toHaveBeenCalled();
   });
 
+  it('returns a distinct 404 result when the quote does not exist', async () => {
+    const deps = makeDeps({ loadQuote: vi.fn().mockResolvedValue(null) });
+    const result = await finalizeQuote(deps, 'missing');
+
+    expect(result).toEqual({ ok: false, status: 404, error: 'Offerte niet gevonden' });
+    expect(deps.updateStatusToFinal).not.toHaveBeenCalled();
+    expect(deps.renderPdf).not.toHaveBeenCalled();
+  });
+
+  it('returns a 500 result instead of throwing when updateStatusToFinal fails', async () => {
+    const deps = makeDeps({ updateStatusToFinal: vi.fn().mockRejectedValue(new Error('db boom')) });
+
+    await expect(finalizeQuote(deps, 'q1')).resolves.toEqual({
+      ok: false,
+      status: 500,
+      error: 'Afwerken mislukt. Probeer opnieuw.',
+    });
+    expect(deps.renderPdf).not.toHaveBeenCalled();
+    expect(deps.log).not.toHaveBeenCalled();
+  });
+
   it('flips status to final and generates a PDF on success', async () => {
     const deps = makeDeps();
     const result = await finalizeQuote(deps, 'q1');

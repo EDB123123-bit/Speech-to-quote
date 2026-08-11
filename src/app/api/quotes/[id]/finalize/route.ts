@@ -36,7 +36,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     updateStatusToFinal: async (quoteId) => {
       const { error } = await supabase
         .from('quotes').update({ status: 'final' }).eq('id', quoteId).eq('status', 'draft');
-      if (error) throw new Error('Afwerken mislukt. Probeer opnieuw.');
+      if (error) throw new Error(error.message);
     },
     loadContractor: async (contractorId) => {
       const { data } = await supabase.from('contractors').select('*').eq('id', contractorId).single();
@@ -57,8 +57,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const result = await finalizeQuote(deps, id);
 
-  if (!result.ok && 'error' in result) {
-    return NextResponse.json({ error: result.error }, { status: 404 });
+  if (!result.ok && 'status' in result) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
   if (!result.ok) {
     return NextResponse.json({ blockers: result.blockers }, { status: 422 });

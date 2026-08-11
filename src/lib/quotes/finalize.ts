@@ -19,11 +19,15 @@ export type FinalizeDeps = {
   }) => Promise<void>;
 };
 
-export type FinalizeResult = { ok: true } | { ok: false; blockers: FinalizeBlocker[] } | { ok: false; error: string };
+export type FinalizeResult =
+  | { ok: true }
+  | { ok: false; blockers: FinalizeBlocker[] }
+  | { ok: false; status: 404; error: string }
+  | { ok: false; status: 500; error: string };
 
 export async function finalizeQuote(deps: FinalizeDeps, quoteId: string): Promise<FinalizeResult> {
   const quote = await deps.loadQuote(quoteId);
-  if (!quote) return { ok: false, error: 'Offerte niet gevonden' };
+  if (!quote) return { ok: false, status: 404, error: 'Offerte niet gevonden' };
 
   const [lineItems, clarifications] = await Promise.all([
     deps.loadLineItems(quoteId),
@@ -33,7 +37,14 @@ export async function finalizeQuote(deps: FinalizeDeps, quoteId: string): Promis
   const blockers = checkFinalizeGate({ quote, lineItems, clarifications });
   if (blockers.length > 0) return { ok: false, blockers };
 
-  await deps.updateStatusToFinal(quoteId);
+  try {
+    await deps.updateStatusToFinal(quoteId);
+  } catch {
+    // Matches the original inline route: any DB failure here (e.g. the row was
+    // no longer in 'draft' status, or a genuine write error) surfaces the same
+    // generic Dutch message rather than leaking Supabase internals.
+    return { ok: false, status: 500, error: 'Afwerken mislukt. Probeer opnieuw.' };
+  }
 
   // PDF failure must not undo finalizing — the quote is already correct and
   // the PDF can be regenerated on demand from the download route.

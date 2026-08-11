@@ -41,6 +41,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/offertes/nieuw" data-tour="nav-nieuwe-offerte" className="text-muted hover:text-accent">
               Nieuwe offerte
             </Link>
+            <Link href="/pijplijn" className="text-muted hover:text-accent">
+              Pijplijn
+            </Link>
             <div className="ml-auto flex items-center gap-4">
               <Link href="/instellingen" data-tour="nav-instellingen" className="text-muted hover:text-accent">
                 Instellingen

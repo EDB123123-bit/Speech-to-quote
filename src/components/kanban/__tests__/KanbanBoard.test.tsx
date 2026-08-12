@@ -72,4 +72,21 @@ describe('KanbanBoard', () => {
     expect(alert).toHaveTextContent('Werk de offerte eerst af.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('clears the busy state and shows a Dutch error when moveQuoteToStage throws', async () => {
+    moveQuoteToStage.mockRejectedValueOnce(new Error('network down'));
+    const user = userEvent.setup();
+    render(<KanbanBoard quotes={[quote({ status: 'final' })]} stages={stages} />);
+
+    await user.click(screen.getByText('Verplaats naar…'));
+    await user.click(screen.getByRole('button', { name: 'Gewonnen' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Verplaatsen mislukt. Probeer opnieuw.');
+    expect(refresh).not.toHaveBeenCalled();
+
+    // The busy state must clear so the move menu becomes usable again
+    // without a full page reload (the menu is already open from above).
+    expect(await screen.findByRole('button', { name: 'Gewonnen' })).toBeEnabled();
+  });
 });

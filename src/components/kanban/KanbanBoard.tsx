@@ -51,13 +51,18 @@ export default function KanbanBoard({
   async function move(quoteId: string, target: MoveTarget) {
     setBusyId(quoteId);
     setError(null);
-    const result = await moveQuoteToStage(quoteId, target);
-    setBusyId(null);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await moveQuoteToStage(quoteId, target);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError('Verplaatsen mislukt. Probeer opnieuw.');
+    } finally {
+      setBusyId(null);
     }
-    router.refresh();
   }
 
   function onDragEnd(event: DragEndEvent) {

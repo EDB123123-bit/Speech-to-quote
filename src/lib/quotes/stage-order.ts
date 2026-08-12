@@ -12,7 +12,7 @@ export function canDeleteStage(
   if (occupiedCount === 0) return { allowed: true };
   return {
     allowed: false,
-    reason: `Verplaats eerst de ${occupiedCount} offerte(s) uit deze fase voordat je ze verwijdert.`,
+    reason: `Verplaats eerst de ${occupiedCount} offerte(s) uit deze fase voordat je deze fase verwijdert.`,
   };
 }
 

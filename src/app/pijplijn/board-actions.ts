@@ -12,6 +12,18 @@ export async function moveQuoteToStage(
   quoteId: string,
   target: MoveTarget,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    return await moveQuoteToStageUnsafe(quoteId, target);
+  } catch (error) {
+    if (error instanceof UnauthorizedError) return { ok: false, error: 'Niet aangemeld' };
+    return { ok: false, error: 'Verplaatsen mislukt. Probeer opnieuw.' };
+  }
+}
+
+async function moveQuoteToStageUnsafe(
+  quoteId: string,
+  target: MoveTarget,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const { supabase, contractor } = await requireContractor();
 
   const result = await movePipelineStage(
@@ -71,13 +83,4 @@ export async function moveQuoteToStage(
 
   if (result.ok) revalidatePath('/pijplijn');
   return result;
-}
-
-export async function requireAuthForBoard(): Promise<void> {
-  try {
-    await requireContractor();
-  } catch (error) {
-    if (error instanceof UnauthorizedError) throw new Error('Niet aangemeld');
-    throw error;
-  }
 }

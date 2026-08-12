@@ -11,38 +11,26 @@ export default function PipelineStagesForm({ stages }: { stages: PipelineStage[]
 
   async function handleAdd(form: FormData) {
     setAddError(null);
-    try {
-      await createStage(form);
-    } catch (e) {
-      setAddError(e instanceof Error ? e.message : 'Opslaan mislukt.');
-    }
+    const result = await createStage(form);
+    if (!result.ok) setAddError(result.error);
   }
 
   async function handleRename(id: string, form: FormData) {
     setError(null);
-    try {
-      await renameStage(id, form);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Opslaan mislukt.');
-    }
+    const result = await renameStage(id, form);
+    if (!result.ok) setError(result.error);
   }
 
   async function handleDelete(id: string) {
     setError(null);
-    try {
-      await deleteStage(id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Verwijderen mislukt. Probeer opnieuw.');
-    }
+    const result = await deleteStage(id);
+    if (!result.ok) setError(result.error);
   }
 
   async function handleReorder(id: string, direction: 'up' | 'down') {
     setError(null);
-    try {
-      await reorderStage(id, direction);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Herordenen mislukt. Probeer opnieuw.');
-    }
+    const result = await reorderStage(id, direction);
+    if (!result.ok) setError(result.error);
   }
 
   return (

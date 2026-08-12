@@ -5,10 +5,10 @@ import userEvent from '@testing-library/user-event';
 import type { PipelineStage } from '@/lib/supabase/types';
 
 const { createStage, deleteStage, renameStage, reorderStage } = vi.hoisted(() => ({
-  createStage: vi.fn(),
-  deleteStage: vi.fn(),
-  renameStage: vi.fn(),
-  reorderStage: vi.fn(),
+  createStage: vi.fn().mockResolvedValue({ ok: true }),
+  deleteStage: vi.fn().mockResolvedValue({ ok: true }),
+  renameStage: vi.fn().mockResolvedValue({ ok: true }),
+  reorderStage: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 vi.mock('@/app/instellingen/pipeline-stage-actions', () => ({
@@ -28,7 +28,7 @@ afterEach(() => {
 
 describe('PipelineStagesForm', () => {
   it('surfaces the Dutch error from a failed delete', async () => {
-    deleteStage.mockRejectedValueOnce(new Error('Verplaats eerst de 3 offerte(s) uit deze fase voordat je ze verwijdert.'));
+    deleteStage.mockResolvedValueOnce({ ok: false, error: 'Verplaats eerst de 3 offerte(s) uit deze fase voordat je deze fase verwijdert.' });
     const user = userEvent.setup();
     render(<PipelineStagesForm stages={[stage]} />);
 

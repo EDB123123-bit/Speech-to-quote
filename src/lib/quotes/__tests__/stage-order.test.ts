@@ -19,7 +19,7 @@ describe('canDeleteStage', () => {
   it('blocks deleting an occupied stage with a count in the message', () => {
     const result = canDeleteStage(3);
     expect(result.allowed).toBe(false);
-    if (!result.allowed) expect(result.reason).toBe('Verplaats eerst de 3 offerte(s) uit deze fase voordat je ze verwijdert.');
+    if (!result.allowed) expect(result.reason).toBe('Verplaats eerst de 3 offerte(s) uit deze fase voordat je deze fase verwijdert.');
   });
 });
 

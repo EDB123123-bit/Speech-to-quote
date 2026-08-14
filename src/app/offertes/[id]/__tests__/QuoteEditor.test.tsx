@@ -132,4 +132,17 @@ describe('QuoteEditor', () => {
       expect(screen.getByText(/kon niet opgeslagen worden/i)).toBeInTheDocument(),
     );
   });
+
+  it('shows the new line item after adding it succeeds', async () => {
+    (addLineItem as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      line({ id: 'line-2', description: 'Nieuw item – materiaal', unit_price_cents: null, vat_rate: null }),
+    );
+
+    render(<QuoteEditor quote={quote} initialLineItems={[]} initialClarifications={[]} />);
+    await userEvent.click(screen.getByRole('button', { name: /materiaal toevoegen/i }));
+
+    await waitFor(() =>
+      expect(screen.getByDisplayValue('Nieuw item – materiaal')).toBeInTheDocument(),
+    );
+  });
 });

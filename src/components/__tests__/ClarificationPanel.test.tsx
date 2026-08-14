@@ -139,4 +139,11 @@ describe('ClarificationPanel', () => {
     );
     expect(screen.getByText(/alle vragen beantwoord/i)).toBeInTheDocument();
   });
+
+  it('does not show an answered message when no questions were generated', () => {
+    const { container } = render(
+      <ClarificationPanel quoteId="quote-1" clarifications={[]} onResolved={vi.fn()} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
 });

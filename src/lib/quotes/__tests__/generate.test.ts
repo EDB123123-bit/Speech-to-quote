@@ -54,6 +54,30 @@ describe('generateQuote', () => {
     expect(rows.map((r: { line_type: string }) => r.line_type)).toEqual(['materials', 'labor']);
   });
 
+  it('recovers a priced catalog item that the model omitted', async () => {
+    const windows: CatalogItem = {
+      id: 'cat-2', contractor_id: 'c1', name: 'Ramen', unit: 'stuk',
+      materials_price_cents: 100000, labor_price_cents: 50000, vat_rate: 0.21,
+      created_at: '2026-08-06T00:00:00Z',
+    };
+    const deps = makeDeps({
+      loadCatalog: vi.fn().mockResolvedValue([...catalog, windows]),
+      transcribe: vi.fn().mockResolvedValue('20 vierkante meter en 2 ramen'),
+      extract: vi.fn().mockResolvedValue({ tasks: [], clarifications: [] }),
+    });
+
+    await generateQuote(deps, { audio: audio(), contractorId: 'c1' });
+
+    const rows = deps.saveLineItems.mock.calls[0][1] as Array<{
+      catalog_item_id: string | null;
+      quantity: number;
+    }>;
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.catalog_item_id === 'cat-2')).toBe(true);
+    expect(rows.every((row) => row.quantity === 2)).toBe(true);
+    expect(deps.saveClarifications).toHaveBeenCalledWith('quote-1', []);
+  });
+
   it('persists the transcript and the clarifications', async () => {
     const deps = makeDeps();
     await generateQuote(deps, { audio: audio(), contractorId: 'c1' });

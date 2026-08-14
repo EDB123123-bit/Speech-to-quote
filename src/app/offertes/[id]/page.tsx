@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { requireContractor } from '@/lib/auth/require-contractor';
+import DeleteQuoteButton from '@/components/DeleteQuoteButton';
 import QuoteEditor from './QuoteEditor';
 import type { Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
@@ -20,9 +21,12 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       <h1 className="mb-2 text-3xl font-semibold">
         Offerte {(quote as Quote).id.split('-')[0].toUpperCase()}
       </h1>
-      <span className={`badge mb-6 inline-flex ${(quote as Quote).status === 'final' ? 'badge-success' : 'badge-neutral'}`}>
-        {(quote as Quote).status === 'final' ? 'Afgewerkt' : 'Concept'}
-      </span>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <span className={`badge inline-flex ${(quote as Quote).status === 'final' ? 'badge-success' : 'badge-neutral'}`}>
+          {(quote as Quote).status === 'final' ? 'Afgewerkt' : 'Concept'}
+        </span>
+        <DeleteQuoteButton quoteId={(quote as Quote).id} redirectTo="/offertes" />
+      </div>
 
       <QuoteEditor
         quote={quote as Quote}

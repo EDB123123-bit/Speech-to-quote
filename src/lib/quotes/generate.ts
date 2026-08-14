@@ -1,4 +1,5 @@
 import { expandTasksToLineItems, type NewLineItem } from '@/lib/quotes/expand';
+import { reconcileExtraction } from '@/lib/quotes/reconcile';
 import type { ExtractionResult } from '@/lib/ai/schemas';
 import type { CatalogItem, PipelineStep } from '@/lib/supabase/types';
 
@@ -93,7 +94,7 @@ export async function generateQuote(
   // --- extract ------------------------------------------------------------
   let extraction: ExtractionResult;
   try {
-    extraction = await deps.extract(transcript, catalog);
+    extraction = reconcileExtraction(transcript, await deps.extract(transcript, catalog), catalog);
     await deps.log({
       quoteId, contractorId, step: 'extract', status: 'success',
       detail: { taskCount: extraction.tasks.length, clarificationCount: extraction.clarifications.length },

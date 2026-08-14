@@ -14,20 +14,25 @@ export async function updateLineItem(id: string, patch: LineItemPatch): Promise<
   if (error) throw new Error('Opslaan mislukt. Probeer opnieuw.');
 }
 
-export async function addLineItem(quoteId: string, lineType: LineType): Promise<void> {
+export async function addLineItem(quoteId: string, lineType: LineType): Promise<QuoteLineItem> {
   const { supabase } = await requireContractor();
-  const { error } = await supabase.from('quote_line_items').insert({
-    quote_id: quoteId,
-    description: lineType === 'materials' ? 'Nieuw item – materiaal' : 'Nieuw item – arbeid',
-    quantity: 1,
-    unit: 'stuk',
-    unit_price_cents: null,
-    vat_rate: null,
-    line_type: lineType,
-    sort_order: 999,
-  });
-  if (error) throw new Error('Toevoegen mislukt. Probeer opnieuw.');
+  const { data, error } = await supabase
+    .from('quote_line_items')
+    .insert({
+      quote_id: quoteId,
+      description: lineType === 'materials' ? 'Nieuw item – materiaal' : 'Nieuw item – arbeid',
+      quantity: 1,
+      unit: 'stuk',
+      unit_price_cents: null,
+      vat_rate: null,
+      line_type: lineType,
+      sort_order: 999,
+    })
+    .select('*')
+    .single();
+  if (error || !data) throw new Error('Toevoegen mislukt. Probeer opnieuw.');
   revalidatePath(`/offertes/${quoteId}`);
+  return data as QuoteLineItem;
 }
 
 export async function removeLineItem(id: string): Promise<void> {

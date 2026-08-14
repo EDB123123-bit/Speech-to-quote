@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireContractor } from '@/lib/auth/require-contractor';
+import DeleteQuoteButton from '@/components/DeleteQuoteButton';
 import type { Quote } from '@/lib/supabase/types';
 
 export default async function QuotesPage() {
@@ -29,17 +30,23 @@ export default async function QuotesPage() {
         <ul className="flex flex-col gap-3">
           {quotes.map((quote) => (
             <li key={quote.id}>
-              <Link href={`/offertes/${quote.id}`} className="card flex items-center justify-between transition-colors hover:border-ink">
-                <div>
-                  <p className="font-medium">{quote.customer_name ?? 'Zonder klantnaam'}</p>
-                  <p className="nums text-sm text-muted">
-                    {new Date(quote.created_at).toLocaleDateString('nl-BE')}
-                  </p>
-                </div>
-                <span className={`badge ${quote.status === 'final' ? 'badge-success' : 'badge-neutral'}`}>
-                  {quote.status === 'final' ? 'Afgewerkt' : 'Concept'}
-                </span>
-              </Link>
+              <div className="card flex items-center justify-between gap-3">
+                <Link
+                  href={`/offertes/${quote.id}`}
+                  className="flex min-w-0 flex-1 items-center justify-between transition-colors hover:text-accent"
+                >
+                  <div>
+                    <p className="font-medium">{quote.customer_name ?? 'Zonder klantnaam'}</p>
+                    <p className="nums text-sm text-muted">
+                      {new Date(quote.created_at).toLocaleDateString('nl-BE')}
+                    </p>
+                  </div>
+                  <span className={`badge ${quote.status === 'final' ? 'badge-success' : 'badge-neutral'}`}>
+                    {quote.status === 'final' ? 'Afgewerkt' : 'Concept'}
+                  </span>
+                </Link>
+                <DeleteQuoteButton quoteId={quote.id} />
+              </div>
             </li>
           ))}
         </ul>

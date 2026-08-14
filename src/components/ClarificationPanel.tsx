@@ -91,6 +91,10 @@ export default function ClarificationPanel({ quoteId, clarifications, onResolved
     }
   }
 
+  if (clarifications.length === 0) {
+    return null;
+  }
+
   if (pending.length === 0) {
     return (
       <p className="alert alert-success">

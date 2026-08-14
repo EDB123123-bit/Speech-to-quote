@@ -7,7 +7,7 @@ import ClarificationPanel from '@/components/ClarificationPanel';
 import CustomerForm from '@/components/CustomerForm';
 import { checkFinalizeGate } from '@/lib/quotes/finalize-gate';
 import { updateLineItem, addLineItem } from '@/app/offertes/[id]/line-item-actions';
-import type { Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
+import type { LineType, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
 type Props = {
   quote: Quote;
@@ -20,6 +20,7 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
   const [lineItems, setLineItems] = useState(initialLineItems);
   const [blockerMessages, setBlockerMessages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [addingLineType, setAddingLineType] = useState<LineType | null>(null);
   // Set when a line item edit fails to persist to the database. The PDF is
   // rendered server-side from the DB, so an unsaved edit that the contractor
   // thinks succeeded must block finalizing rather than fail silently.
@@ -78,6 +79,20 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
     }
   }
 
+  async function addLine(lineType: LineType) {
+    setAddingLineType(lineType);
+    setSaveFailed(false);
+
+    try {
+      const item = await addLineItem(quote.id, lineType);
+      setLineItems((current) => [...current, item]);
+    } catch {
+      setSaveFailed(true);
+    } finally {
+      setAddingLineType(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {quote.transcript && (
@@ -103,31 +118,19 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              onClick={() =>
-                void addLineItem(quote.id, 'materials')
-                  .then(() => {
-                    setSaveFailed(false);
-                    router.refresh();
-                  })
-                  .catch(() => setSaveFailed(true))
-              }
+              onClick={() => void addLine('materials')}
+              disabled={addingLineType !== null}
               className="btn btn-outline"
             >
-              + Materiaal toevoegen
+              {addingLineType === 'materials' ? 'Bezig…' : '+ Materiaal toevoegen'}
             </button>
             <button
               type="button"
-              onClick={() =>
-                void addLineItem(quote.id, 'labor')
-                  .then(() => {
-                    setSaveFailed(false);
-                    router.refresh();
-                  })
-                  .catch(() => setSaveFailed(true))
-              }
+              onClick={() => void addLine('labor')}
+              disabled={addingLineType !== null}
               className="btn btn-outline"
             >
-              + Arbeid toevoegen
+              {addingLineType === 'labor' ? 'Bezig…' : '+ Arbeid toevoegen'}
             </button>
           </div>
         )}

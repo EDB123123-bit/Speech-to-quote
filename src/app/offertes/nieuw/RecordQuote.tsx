@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import VoiceRecorder from '@/components/VoiceRecorder';
+import Icon from '@/components/ui/Icon';
 
 export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: boolean }) {
   const router = useRouter();
@@ -45,25 +46,51 @@ export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: bool
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       {!hasCatalogItems && (
         <p role="alert" className="alert alert-warning">
-          Stel eerst je prijslijst in bij Instellingen. Zonder prijzen kan er geen offerte gemaakt worden.
+          <Icon name="warning" size={21} />
+          <span>Stel eerst je prijslijst in bij Instellingen. Zonder prijzen kan er geen offerte gemaakt worden.</span>
         </p>
       )}
 
-      <div data-tour="record-button">
-        <VoiceRecorder
-          onRecorded={onRecorded}
-          label="Beschrijf de klus"
-          disabled={!hasCatalogItems || status === 'uploading'}
-        />
-      </div>
-
-      {status === 'uploading' && <p className="text-sm text-muted">Bezig met verwerken…</p>}
+      {status !== 'uploading' ? (
+        <>
+          <div className="example-card">
+            <p className="eyebrow">Bijvoorbeeld</p>
+            <ul>
+              <li>“45 vierkante meter pannen vernieuwen.”</li>
+              <li>“12 meter dakgoot vervangen in zink.”</li>
+              <li>“Twee dagen werk, met container.”</li>
+              <li>“Het gebouw is ouder dan tien jaar.”</li>
+            </ul>
+          </div>
+          <div data-tour="record-button" className="record-card">
+            <VoiceRecorder
+              onRecorded={onRecorded}
+              label="Tik om te beginnen"
+              disabled={!hasCatalogItems}
+              variant="hero"
+            />
+          </div>
+        </>
+      ) : (
+        <section aria-live="polite">
+          <h2 className="mb-2 text-2xl">Ik maak je offerte.</h2>
+          <p className="page-subtitle mb-5">Dit duurt ongeveer een halve minuut. Je mag je telefoon wegleggen.</p>
+          <div className="processing-panel">
+            <div className="processing-step"><span className="step-icon"><Icon name="check" size={19} /></span>Opname bewaard</div>
+            <div className="processing-step"><span className="step-icon"><Icon name="check" size={19} /></span>Uitgeschreven wat je zei</div>
+            <div className="processing-step"><span className="step-icon is-loading"><span className="spinner" /></span>Je prijzen erbij zoeken</div>
+          </div>
+          <p className="mt-4 rounded-3xl bg-[var(--paper-strong)] p-5 font-semibold leading-relaxed text-muted">
+            Loopt het mis? Je opname blijft staan. Je kan ze opnieuw laten verwerken.
+          </p>
+        </section>
+      )}
 
       {status === 'error' && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <p role="alert" className="alert alert-critical">{error}</p>
           {lastRecording && (
             <button

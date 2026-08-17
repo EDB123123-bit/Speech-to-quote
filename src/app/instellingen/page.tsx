@@ -34,30 +34,51 @@ export default async function SettingsPage({ searchParams }: Props) {
     : null;
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <h1 className="mb-8 text-3xl font-semibold">Instellingen</h1>
+    <main className="page-shell page-medium">
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">Beheer je werkruimte</p>
+          <h1 className="page-title">Instellingen</h1>
+          <p className="page-subtitle">Je bedrijfsgegevens, prijzen en opvolging op één plek.</p>
+        </div>
+      </header>
 
-      <section className="mb-10">
-        <h2 className="mb-2 text-lg font-semibold">Bedrijfsgegevens</h2>
-        <p className="mb-4 text-sm text-muted">
+      <nav className="settings-nav" aria-label="Onderdelen van instellingen">
+        <a href="#bedrijf">Bedrijf</a>
+        <a href="#prijslijst">Prijslijst</a>
+        <a href="#mailbox">Mailbox</a>
+        <a href="#pijplijnfasen">Pijplijnfasen</a>
+      </nav>
+
+      <section id="bedrijf" className="settings-section">
+        <h2 className="section-heading">Bedrijfsgegevens</h2>
+        <p className="section-copy">
           Deze gegevens verschijnen op elke offerte die je genereert.
         </p>
         <ProfileForm contractor={contractor} />
       </section>
 
-      <section className="mb-10">
-        <h2 className="mb-3 text-lg font-semibold">Mailbox</h2>
-        <p className="mb-4 text-sm text-muted">
+      <section id="prijslijst" className="settings-section">
+        <h2 className="section-heading">Prijslijst</h2>
+        <p className="section-copy">
+          Hiermee zet ik je gesproken beschrijving om in de juiste prijzen.
+        </p>
+        <CatalogForm items={(catalogItems ?? []) as CatalogItem[]} />
+      </section>
+
+      <section id="mailbox" className="settings-section">
+        <h2 className="section-heading">Mailbox</h2>
+        <p className="section-copy">
           Verstuur afgewerkte offertes vanuit je eigen Gmail- of Outlook-adres.
         </p>
 
         {params.mailbox === 'connected' && (
-          <p role="status" className="mb-4 rounded border border-green-300 bg-green-50 p-3 text-sm text-green-800">
+          <p role="status" className="alert alert-success mb-4">
             Je mailbox is verbonden.
           </p>
         )}
         {mailboxError && (
-          <p role="alert" className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <p role="alert" className="alert alert-critical mb-4">
             {mailboxError}
           </p>
         )}
@@ -65,17 +86,9 @@ export default async function SettingsPage({ searchParams }: Props) {
         <MailboxCard mailbox={mailbox} />
       </section>
 
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Prijslijst</h2>
-        <p className="mb-4 text-sm text-muted">
-          Je eigen prijzen. Deze worden gebruikt om je gesproken beschrijving om te zetten in een offerte.
-        </p>
-        <CatalogForm items={(catalogItems ?? []) as CatalogItem[]} />
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Pijplijnfasen</h2>
-        <p className="mb-4 text-sm text-muted">
+      <section id="pijplijnfasen" className="settings-section">
+        <h2 className="section-heading">Pijplijnfasen</h2>
+        <p className="section-copy">
           De fasen die een offerte doorloopt nadat ze is afgewerkt, zoals je ze wil bijhouden in Pijplijn.
         </p>
         <PipelineStagesForm stages={(stages ?? []) as PipelineStage[]} />
@@ -87,13 +100,13 @@ export default async function SettingsPage({ searchParams }: Props) {
 function MailboxCard({ mailbox }: { mailbox: MailboxSummary | null }) {
   if (!mailbox) {
     return (
-      <div className="rounded border p-4">
-        <p className="mb-4 text-sm">Er is nog geen mailbox verbonden.</p>
+      <div className="card">
+        <p className="mb-4 font-semibold">Er is nog geen mailbox verbonden.</p>
         <div className="flex flex-wrap gap-2">
-          <a href="/api/mailbox/connect/gmail" className="rounded bg-black px-4 py-2 text-sm text-white">
+          <a href="/api/mailbox/connect/gmail" className="btn btn-primary">
             Gmail verbinden
           </a>
-          <a href="/api/mailbox/connect/outlook" className="rounded border px-4 py-2 text-sm">
+          <a href="/api/mailbox/connect/outlook" className="btn btn-outline">
             Outlook verbinden
           </a>
         </div>
@@ -105,17 +118,17 @@ function MailboxCard({ mailbox }: { mailbox: MailboxSummary | null }) {
   const reconnectHref = `/api/mailbox/connect/${mailbox.provider}`;
 
   return (
-    <div className={`rounded border p-4 ${mailbox.status === 'disconnected' ? 'border-amber-300 bg-amber-50' : ''}`}>
-      <p className="font-medium">{mailbox.email_address}</p>
-      <p className="mt-1 text-sm text-gray-600">
+    <div className={`card ${mailbox.status === 'disconnected' ? 'bg-warning-bg' : ''}`}>
+      <p className="font-bold">{mailbox.email_address}</p>
+      <p className="mt-1 text-sm font-medium text-muted">
         {provider} · {mailbox.status === 'connected' ? 'Verbonden' : 'Opnieuw verbinden nodig'}
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <a href={reconnectHref} className="rounded border px-4 py-2 text-sm">
+        <a href={reconnectHref} className="btn btn-outline">
           {mailbox.status === 'connected' ? 'Herverbinden' : 'Opnieuw verbinden'}
         </a>
         <form action={disconnectMailbox}>
-          <button type="submit" className="rounded border border-red-300 px-4 py-2 text-sm text-red-700">
+          <button type="submit" className="btn btn-outline text-critical">
             Verbinding verbreken
           </button>
         </form>

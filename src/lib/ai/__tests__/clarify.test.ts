@@ -61,6 +61,17 @@ describe('processClarificationAnswer', () => {
     expect(result.newTasks[0].quantity).toBe(80);
   });
 
+  it('finds the answer JSON after a non-text content block', async () => {
+    impl = async () => ({
+      content: [
+        { type: 'thinking', thinking: 'Ik controleer het antwoord.' },
+        { type: 'text', text: '{"resolved":true,"rephrasedQuestionNl":null,"newTasks":[],"updatedLineItems":[]}' },
+      ],
+    });
+
+    await expect(processClarificationAnswer(args)).resolves.toMatchObject({ resolved: true });
+  });
+
   it('returns a rephrased question when the answer missed the point', async () => {
     impl = async () =>
       reply({

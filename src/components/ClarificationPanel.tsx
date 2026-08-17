@@ -4,6 +4,7 @@ import { useState } from 'react';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import type { ClarificationStatus, QuoteClarification } from '@/lib/supabase/types';
 import { dismissClarification } from '@/app/offertes/[id]/clarification-actions';
+import Icon from '@/components/ui/Icon';
 
 type Props = {
   quoteId: string;
@@ -98,28 +99,32 @@ export default function ClarificationPanel({ quoteId, clarifications, onResolved
   if (pending.length === 0) {
     return (
       <p className="alert alert-success">
+        <Icon name="check" size={20} />
         Alle vragen beantwoord. Je kan de offerte afwerken.
       </p>
     );
   }
 
   return (
-    <section className="card flex flex-col gap-3 border-warning/40 bg-warning-bg/40">
-      <h2 className="font-semibold">
-        Te verduidelijken (<span data-testid="pending-count" className="nums">{pending.length}</span>)
+    <section className="clarification-card">
+      <p className="eyebrow text-warning">Nog te doen</p>
+      <h2>
+        <span data-testid="pending-count" className="nums">{pending.length}</span>{' '}
+        {pending.length === 1 ? 'vraag beantwoorden' : 'vragen beantwoorden'}
       </h2>
-      <p className="text-sm text-muted">
-        Beantwoord deze vragen hardop, of vul ze hieronder handmatig aan.
+      <p className="mb-4 mt-1 text-sm font-semibold text-warning">
+        Spreek je antwoord in of duid aan dat de vraag niet nodig is.
       </p>
 
       {error && <p role="alert" className="alert alert-critical">{error}</p>}
 
-      <ul className="flex flex-col gap-4">
-        {pending.map((item) => {
+      <ul>
+        {pending.map((item, index) => {
           const state = stateOf(item);
           return (
-            <li key={item.id} className="card bg-surface">
-              <p className="mb-3 font-medium">{state.question}</p>
+            <li key={item.id} className="clarification-item">
+              <p className="eyebrow text-warning">Vraag {index + 1} van {pending.length}</p>
+              <p className="clarification-question">{state.question}</p>
 
               {state.capped && (
                 <p className="mb-3 text-sm text-warning">
@@ -127,11 +132,11 @@ export default function ClarificationPanel({ quoteId, clarifications, onResolved
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => void playQuestion(item.id)}
-                  className="btn btn-outline"
+                  className="btn btn-quiet"
                 >
                   ▶ Vraag afspelen
                 </button>
@@ -140,12 +145,13 @@ export default function ClarificationPanel({ quoteId, clarifications, onResolved
                   onRecorded={(audio) => void submitAnswer(item.id, audio)}
                   label="Antwoord opnemen"
                   disabled={busyId === item.id}
+                  variant="compact"
                 />
 
                 <button
                   type="button"
                   onClick={() => void dismiss(item.id)}
-                  className="text-sm font-medium text-muted underline underline-offset-2 hover:text-ink"
+                  className="btn btn-quiet"
                 >
                   Niet van toepassing
                 </button>

@@ -1,4 +1,6 @@
 import { requireContractor } from '@/lib/auth/require-contractor';
+import Link from 'next/link';
+import Icon from '@/components/ui/Icon';
 import RecordQuote from './RecordQuote';
 
 export default async function NewQuotePage() {
@@ -8,11 +10,15 @@ export default async function NewQuotePage() {
     .select('id', { count: 'exact', head: true });
 
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="mb-2 text-3xl font-semibold">Nieuwe offerte</h1>
-      <p className="mb-8 text-muted">
-        Beschrijf de klus hardop: wat moet er gebeuren, met welke materialen en hoeveel.
-      </p>
+    <main className="page-shell page-narrow">
+      <Link href="/offertes" className="back-link"><Icon name="arrow-left" /> Terug naar offertes</Link>
+      <div className="record-intro">
+        <p className="eyebrow">Nieuwe offerte</p>
+        <h1 className="page-title">Vertel wat er moet gebeuren.</h1>
+        <p className="page-subtitle">
+          Noem de werken, aantallen en materialen. Spreek zoals je het aan een collega zou uitleggen.
+        </p>
+      </div>
       <RecordQuote hasCatalogItems={(count ?? 0) > 0} />
     </main>
   );

@@ -41,9 +41,9 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="card flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="card flex flex-col gap-4 shadow-[var(--shadow)]">
       {mode === 'signup' && (
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-2">
           <span className="label">Bedrijfsnaam</span>
           <input
             required
@@ -53,7 +53,7 @@ export default function LoginForm() {
           />
         </label>
       )}
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col gap-2">
         <span className="label">E-mailadres</span>
         <input
           required
@@ -63,7 +63,7 @@ export default function LoginForm() {
           className="field"
         />
       </label>
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col gap-2">
         <span className="label">Wachtwoord</span>
         <input
           required
@@ -77,7 +77,7 @@ export default function LoginForm() {
 
       {error && <p role="alert" className="alert alert-critical">{error}</p>}
 
-      <button type="submit" disabled={busy} className="btn btn-accent">
+      <button type="submit" disabled={busy} className="btn btn-primary">
         {busy ? 'Bezig…' : mode === 'login' ? 'Aanmelden' : 'Account aanmaken'}
       </button>
       <button

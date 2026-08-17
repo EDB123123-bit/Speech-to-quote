@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { getAnthropic, extractionModel } from '@/lib/ai/anthropic-client';
-import { ExtractedTaskSchema, stripCodeFence } from '@/lib/ai/schemas';
+import { ExtractedTaskSchema } from '@/lib/ai/schemas';
+import { firstTextBlock, parseJsonObject } from '@/lib/ai/response';
 import type { CatalogItem, QuoteLineItem } from '@/lib/supabase/types';
 
 export class ClarificationError extends Error {
@@ -98,14 +99,14 @@ export async function processClarificationAnswer(args: {
     throw new ClarificationError('Verwerken van antwoord mislukt', { cause: error });
   }
 
-  const block = response.content[0];
-  if (!block || block.type !== 'text') {
+  const text = firstTextBlock(response);
+  if (!text) {
     throw new ClarificationError('Onverwacht antwoordformaat van het model');
   }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripCodeFence(block.text));
+    parsed = parseJsonObject(text);
   } catch (error) {
     throw new ClarificationError('Model gaf geen geldige JSON terug', { cause: error });
   }

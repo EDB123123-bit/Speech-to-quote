@@ -33,8 +33,14 @@ export default async function PijplijnPage() {
   }));
 
   return (
-    <main className="mx-auto max-w-6xl p-6">
-      <h1 className="mb-6 text-3xl font-semibold">Pijplijn</h1>
+    <main className="page-shell">
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">Opvolging</p>
+          <h1 className="page-title">Pijplijn</h1>
+          <p className="page-subtitle">Zie meteen welke offertes nog actie nodig hebben.</p>
+        </div>
+      </header>
       <KanbanBoard quotes={quotesWithTotals} stages={(stages ?? []) as PipelineStage[]} />
     </main>
   );

@@ -7,6 +7,9 @@ import ClarificationPanel from '@/components/ClarificationPanel';
 import CustomerForm from '@/components/CustomerForm';
 import EmailQuoteForm from '@/components/EmailQuoteForm';
 import { checkFinalizeGate } from '@/lib/quotes/finalize-gate';
+import { calculateTotals, formatEuros, toTotalsInput } from '@/lib/money/totals';
+import Icon from '@/components/ui/Icon';
+import ShareQuoteButton from '@/components/ShareQuoteButton';
 import { updateLineItem, addLineItem } from '@/app/offertes/[id]/line-item-actions';
 import type { LineType, MailboxSummary, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
@@ -29,6 +32,7 @@ export default function QuoteEditor({
   const [lineItems, setLineItems] = useState(initialLineItems);
   const [blockerMessages, setBlockerMessages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [addingLineType, setAddingLineType] = useState<LineType | null>(null);
   // Set when a line item edit fails to persist to the database. The PDF is
   // rendered server-side from the DB, so an unsaved edit that the contractor
@@ -37,6 +41,9 @@ export default function QuoteEditor({
 
   const isFinal = quote.status === 'final';
   const blockers = checkFinalizeGate({ quote, lineItems, clarifications: initialClarifications });
+  const totals = calculateTotals(toTotalsInput(lineItems));
+  const pendingQuestions = initialClarifications.filter((item) => item.status === 'pending').length;
+  const incompleteLines = lineItems.filter((item) => item.unit_price_cents === null || item.vat_rate === null).length;
 
   function onLineItemsChange(next: QuoteLineItem[]) {
     setLineItems(next);
@@ -102,93 +109,130 @@ export default function QuoteEditor({
     }
   }
 
+  async function retryProcessing() {
+    setRetrying(true);
+    setBlockerMessages([]);
+    try {
+      const response = await fetch(`/api/quotes/${quote.id}/retry`, { method: 'POST' });
+      const body = await response.json();
+      if (!response.ok) {
+        setBlockerMessages([body.error ?? 'Opnieuw toepassen mislukt.']);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setBlockerMessages(['Geen verbinding. Probeer opnieuw.']);
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-6">
-      {quote.transcript && (
-        <details className="card text-sm">
-          <summary className="cursor-pointer font-medium text-muted">Wat ik gehoord heb</summary>
-          <p className="mt-3 text-ink">{quote.transcript}</p>
-        </details>
-      )}
-
-      {!isFinal && (
-        <ClarificationPanel
-          quoteId={quote.id}
-          clarifications={initialClarifications}
-          onResolved={() => router.refresh()}
-        />
-      )}
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Offertelijnen</h2>
-        <LineItemsEditor items={lineItems} onChange={onLineItemsChange} readOnly={isFinal} />
+    <div className="quote-workspace">
+      <div className="quote-main">
+        {quote.transcript && (
+          <details className="card text-sm">
+            <summary className="cursor-pointer text-base font-bold">Wat ik gehoord heb</summary>
+            <p className="mt-3 leading-relaxed text-ink">{quote.transcript}</p>
+          </details>
+        )}
 
         {!isFinal && (
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => void addLine('materials')}
-              disabled={addingLineType !== null}
-              className="btn btn-outline"
-            >
-              {addingLineType === 'materials' ? 'Bezig…' : '+ Materiaal toevoegen'}
+          <ClarificationPanel
+            quoteId={quote.id}
+            clarifications={initialClarifications}
+            onResolved={() => router.refresh()}
+          />
+        )}
+
+        {!isFinal && lineItems.length === 0 && (quote.transcript || quote.audio_path) && (
+          <section className="alert alert-warning flex-col items-start gap-3">
+            <div>
+              <strong>Er zijn nog geen offertelijnen.</strong>
+              <p className="mt-1">Ik kan de opname opnieuw verwerken en de prijslijst toepassen zonder opnieuw op te nemen.</p>
+            </div>
+            <button type="button" onClick={() => void retryProcessing()} disabled={retrying} className="btn btn-outline">
+              {retrying ? 'Prijslijst toepassen…' : 'Prijslijst opnieuw toepassen'}
             </button>
-            <button
-              type="button"
-              onClick={() => void addLine('labor')}
-              disabled={addingLineType !== null}
-              className="btn btn-outline"
-            >
-              {addingLineType === 'labor' ? 'Bezig…' : '+ Arbeid toevoegen'}
+          </section>
+        )}
+
+        <section>
+          <p className="eyebrow">Offertelijnen</p>
+          <LineItemsEditor items={lineItems} onChange={onLineItemsChange} readOnly={isFinal} />
+
+          {!isFinal && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => void addLine('materials')} disabled={addingLineType !== null} className="btn btn-quiet">
+                <Icon name="plus" size={19} /> {addingLineType === 'materials' ? 'Bezig…' : 'Materiaal toevoegen'}
+              </button>
+              <button type="button" onClick={() => void addLine('labor')} disabled={addingLineType !== null} className="btn btn-quiet">
+                <Icon name="plus" size={19} /> {addingLineType === 'labor' ? 'Bezig…' : 'Arbeid toevoegen'}
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <aside className="quote-sidebar">
+        {isFinal ? (
+          <div className="ready-card">
+            <span className="ready-icon"><Icon name="check" size={28} /></span>
+            <h2>Offerte is klaar</h2>
+            <p>{quote.customer_name ?? 'Klant'} · {formatEuros(totals.grandTotalCents)} incl. btw</p>
+          </div>
+        ) : (
+          <CustomerForm quote={quote} />
+        )}
+
+        {saveFailed && (
+          <p role="alert" className="alert alert-critical">
+            Een offertelijn kon niet opgeslagen worden. Controleer je verbinding en probeer opnieuw.
+          </p>
+        )}
+
+        {blockerMessages.length > 0 && (
+          <ul role="alert" className="alert alert-critical flex-col">
+            {blockerMessages.map((message) => <li key={message}>{message}</li>)}
+          </ul>
+        )}
+
+        {isFinal ? (
+          <>
+            <section className="quote-sidebar-card">
+              <h2 className="section-heading">Offerte delen</h2>
+              <div className="flex flex-col gap-2">
+              <ShareQuoteButton quoteId={quote.id} customerName={quote.customer_name} />
+              <a href={`/api/quotes/${quote.id}/pdf`} className="btn btn-outline w-full">
+                <Icon name="download" size={21} /> Pdf downloaden
+              </a>
+              </div>
+            </section>
+            <EmailQuoteForm quote={quote} companyName={companyName} mailbox={mailbox} />
+          </>
+        ) : (
+          <div className="sticky-action">
+            {blockers.length > 0 && (
+              <p className="task-summary">
+                Nog te doen: {[
+                  pendingQuestions ? `${pendingQuestions} ${pendingQuestions === 1 ? 'vraag' : 'vragen'}` : '',
+                  incompleteLines ? `${incompleteLines} ${incompleteLines === 1 ? 'prijs' : 'prijzen'}` : '',
+                  blockers.some((blocker) => blocker.code.includes('customer')) ? 'klantgegevens' : '',
+                ].filter(Boolean).join(', ')}.
+              </p>
+            )}
+            <button type="button" onClick={() => void finalize()} disabled={busy || blockers.length > 0 || saveFailed} className="btn btn-primary w-full">
+              {busy ? 'Bezig…' : `Offerte afwerken · ${formatEuros(totals.grandTotalCents)}`}
             </button>
           </div>
         )}
-      </section>
 
-      {!isFinal && <CustomerForm quote={quote} />}
-
-      {saveFailed && (
-        <p role="alert" className="alert alert-critical">
-          Een offertelijn kon niet opgeslagen worden. Controleer je verbinding en probeer opnieuw.
-        </p>
-      )}
-
-      {blockerMessages.length > 0 && (
-        <ul role="alert" className="alert alert-critical flex-col">
-          {blockerMessages.map((message) => (
-            <li key={message}>{message}</li>
-          ))}
-        </ul>
-      )}
-
-      {isFinal ? (
-        <>
-          <a
-            href={`/api/quotes/${quote.id}/pdf`}
-            className="btn btn-accent w-full"
-          >
-            Pdf downloaden
-          </a>
-          <EmailQuoteForm quote={quote} companyName={companyName} mailbox={mailbox} />
-        </>
-      ) : (
-        <button
-          type="button"
-          onClick={() => void finalize()}
-          disabled={busy || blockers.length > 0 || saveFailed}
-          className="btn btn-primary w-full"
-        >
-          {busy ? 'Bezig…' : 'Offerte afwerken'}
-        </button>
-      )}
-
-      {!isFinal && blockers.length > 0 && (
-        <ul className="text-sm text-muted">
-          {blockers.map((blocker) => (
-            <li key={blocker.code}>• {blocker.messageNl}</li>
-          ))}
-        </ul>
-      )}
+        {!isFinal && blockers.length > 0 && (
+          <ul className="text-sm font-medium leading-relaxed text-muted">
+            {blockers.map((blocker) => <li key={blocker.code}>• {blocker.messageNl}</li>)}
+          </ul>
+        )}
+      </aside>
     </div>
   );
 }

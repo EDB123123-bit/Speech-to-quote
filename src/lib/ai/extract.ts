@@ -1,5 +1,6 @@
 import { getAnthropic } from '@/lib/ai/anthropic-client';
-import { ExtractionResultSchema, stripCodeFence, type ExtractionResult } from '@/lib/ai/schemas';
+import { ExtractionResultSchema, type ExtractionResult } from '@/lib/ai/schemas';
+import { firstTextBlock, parseJsonObject } from '@/lib/ai/response';
 import type { CatalogItem } from '@/lib/supabase/types';
 
 export class ExtractionError extends Error {
@@ -76,14 +77,14 @@ async function requestExtraction(prompt: string): Promise<ExtractionResult> {
     messages: [{ role: 'user', content: prompt }],
   });
 
-  const block = response.content[0];
-  if (!block || block.type !== 'text') {
+  const text = firstTextBlock(response);
+  if (!text) {
     throw new ExtractionError('Onverwacht antwoordformaat van het model');
   }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripCodeFence(block.text));
+    parsed = parseJsonObject(text);
   } catch (error) {
     throw new ExtractionError('Model gaf geen geldige JSON terug', { cause: error });
   }
@@ -103,20 +104,17 @@ export async function extractQuoteTasks(
 ): Promise<ExtractionResult> {
   const prompt = buildExtractionPrompt(transcript, catalog);
 
-  try {
-    return await requestExtraction(prompt);
-  } catch (firstError) {
-    if (!(firstError instanceof ExtractionError)) {
-      throw new ExtractionError('Extractie mislukt', { cause: firstError });
-    }
-    // One retry: LLM output is non-deterministic, so a malformed reply is
-    // often transient. A second failure is surfaced to the caller.
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       return await requestExtraction(prompt);
-    } catch (secondError) {
-      throw new ExtractionError('Extractie mislukt na opnieuw proberen', {
-        cause: secondError,
-      });
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2 && process.env.NODE_ENV !== 'test') {
+        await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 250));
+      }
     }
   }
+
+  throw new ExtractionError('Extractie mislukt na opnieuw proberen', { cause: lastError });
 }

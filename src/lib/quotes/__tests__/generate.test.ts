@@ -132,17 +132,24 @@ describe('generateQuote', () => {
     expect(deps.extract).not.toHaveBeenCalled();
   });
 
-  it('keeps the draft quote when extraction fails, so the contractor can fill it in manually', async () => {
+  it('falls back to deterministic catalog matching when extraction fails', async () => {
     const deps = makeDeps({
+      transcribe: vi.fn().mockResolvedValue('20 vierkante meter dekpannen'),
       extract: vi.fn().mockRejectedValue(new ExtractionError('kapot')),
     });
 
-    await expect(
-      generateQuote(deps, { audio: audio(), contractorId: 'c1' }),
-    ).rejects.toMatchObject({ quoteId: 'quote-1' });
+    await expect(generateQuote(deps, { audio: audio(), contractorId: 'c1' })).resolves.toMatchObject({
+      quoteId: 'quote-1',
+    });
 
-    // Transcript is still saved — it is the contractor's record of what they said.
-    expect(deps.saveTranscript).toHaveBeenCalledWith('quote-1', 'tachtig vierkante meter dakpannen');
-    expect(deps.saveLineItems).not.toHaveBeenCalled();
+    const rows = deps.saveLineItems.mock.calls[0][1] as Array<{ catalog_item_id: string | null; quantity: number }>;
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.catalog_item_id === 'cat-1')).toBe(true);
+    expect(rows.every((row) => row.quantity === 20)).toBe(true);
+    expect(deps.log).toHaveBeenCalledWith(expect.objectContaining({
+      step: 'extract',
+      status: 'error',
+      detail: expect.objectContaining({ usedFallback: true }),
+    }));
   });
 });

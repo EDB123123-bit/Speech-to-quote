@@ -20,23 +20,41 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <ul className="flex flex-col gap-3">
-        {items.map((item) => {
+      <div className="line-items">
+        {items.map((item, index) => {
           const incomplete = item.unit_price_cents === null || item.vat_rate === null;
+          const lineTotal = item.unit_price_cents === null
+            ? null
+            : Math.round(item.quantity * item.unit_price_cents);
           return (
-            <li
+            <details
               key={item.id}
-              className={`card ${incomplete ? 'border-warning bg-warning-bg/40' : ''}`}
+              open={items.length === 1 || index === 0}
+              className={`line-item ${incomplete ? 'needs-work' : ''}`}
             >
-              <input
-                aria-label="Omschrijving"
-                value={item.description}
-                disabled={readOnly}
-                onChange={(e) => patch(item.id, { description: e.target.value })}
-                className="field mb-3 font-medium"
-              />
+              <summary className="line-summary">
+                <span>
+                  <span className="line-description">{item.description || 'Nieuwe offertelijn'}</span>
+                  {incomplete ? (
+                    <span className="status-pill is-warning mt-2">Prijs of btw ontbreekt</span>
+                  ) : (
+                    <span className="line-meta">{item.quantity} {item.unit} × {formatEuros(item.unit_price_cents!)} · {item.vat_rate === 0.06 ? '6%' : '21%'} btw</span>
+                  )}
+                </span>
+                <span className="line-total">{lineTotal === null ? 'Invullen' : formatEuros(lineTotal)}</span>
+              </summary>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="line-edit-fields">
+                <label className="label line-edit-title flex flex-col gap-2">
+                  Omschrijving
+                  <input
+                    aria-label="Omschrijving"
+                    value={item.description}
+                    disabled={readOnly}
+                    onChange={(e) => patch(item.id, { description: e.target.value })}
+                    className="field text-ink"
+                  />
+                </label>
                 <label className="label flex flex-col gap-1">
                   Aantal
                   <input
@@ -97,34 +115,29 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                     <option value="0.21">21%</option>
                   </select>
                 </label>
+                {incomplete && (
+                  <p className="alert alert-warning col-span-full">
+                    Vul prijs en btw-tarief aan voordat je de offerte afwerkt.
+                  </p>
+                )}
               </div>
-
-              {incomplete && (
-                <p className="mt-3 text-xs font-medium text-warning">
-                  Vul prijs en btw-tarief aan voordat je de offerte afwerkt.
-                </p>
-              )}
-            </li>
+            </details>
           );
         })}
-      </ul>
+      </div>
 
-      <div className="card nums">
+      <div className="totals-card">
         {totals.vatGroups.map((group) => (
-          <div key={group.vatRate} data-testid={`vat-group-${group.vatRate}`} className="flex justify-between py-1 text-sm text-muted">
-            <span className="font-sans">
-              Subtotaal {group.vatRate === 0.06 ? '6%' : '21%'} btw
-            </span>
-            <span>
-              {formatEuros(group.subtotalCents)} + {formatEuros(group.vatAmountCents)} btw
-            </span>
+          <div key={group.vatRate} data-testid={`vat-group-${group.vatRate}`}>
+            <div className="totals-row"><span>Werk aan {group.vatRate === 0.06 ? '6%' : '21%'} btw</span><span>{formatEuros(group.subtotalCents)}</span></div>
+            <div className="totals-row"><span>Btw {group.vatRate === 0.06 ? '6%' : '21%'}</span><span>{formatEuros(group.vatAmountCents)}</span></div>
           </div>
         ))}
-        <div className="mt-2 flex items-baseline justify-between border-t border-border pt-3">
-          <span className="font-sans text-base font-semibold">Totaal incl. btw</span>
-          <span data-testid="grand-total" className="font-display text-2xl font-semibold">
+        <div className="totals-grand">
+          <strong>Totaal incl. btw</strong>
+          <strong data-testid="grand-total">
             {formatEuros(totals.grandTotalCents)}
-          </span>
+          </strong>
         </div>
       </div>
     </div>

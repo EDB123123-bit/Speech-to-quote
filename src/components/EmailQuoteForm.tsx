@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import type { MailboxSummary, Quote } from '@/lib/supabase/types';
+import Icon from '@/components/ui/Icon';
 
 type Props = {
   quote: Quote;
@@ -20,12 +21,12 @@ export default function EmailQuoteForm({ quote, companyName, mailbox }: Props) {
 
   if (!mailbox) {
     return (
-      <section className="rounded border p-4">
-        <h2 className="font-semibold">Offerte e-mailen</h2>
-        <p className="mt-1 text-sm text-gray-600">
+      <section className="quote-sidebar-card">
+        <h2 className="section-heading">Mailen naar de klant</h2>
+        <p className="mt-1 text-sm font-medium leading-relaxed text-muted">
           Verbind eerst je Gmail- of Outlook-account om offertes vanuit je eigen mailbox te sturen.
         </p>
-        <Link href="/instellingen" className="mt-3 inline-block rounded border px-3 py-2 text-sm">
+        <Link href="/instellingen" className="btn btn-outline mt-3 w-full">
           Mailbox verbinden
         </Link>
       </section>
@@ -34,12 +35,12 @@ export default function EmailQuoteForm({ quote, companyName, mailbox }: Props) {
 
   if (mailbox.status === 'disconnected') {
     return (
-      <section className="rounded border border-amber-300 bg-amber-50 p-4">
-        <h2 className="font-semibold">Mailbox opnieuw verbinden</h2>
-        <p className="mt-1 text-sm text-amber-800">
+      <section className="alert alert-warning flex-col">
+        <h2 className="text-lg">Mailbox opnieuw verbinden</h2>
+        <p className="mt-1 text-sm">
           De toegang tot {mailbox.email_address} is verlopen.
         </p>
-        <Link href="/instellingen" className="mt-3 inline-block rounded border px-3 py-2 text-sm">
+        <Link href="/instellingen#mailbox" className="btn btn-outline mt-3 w-full">
           Naar instellingen
         </Link>
       </section>
@@ -74,36 +75,36 @@ export default function EmailQuoteForm({ quote, companyName, mailbox }: Props) {
   }
 
   return (
-    <section className="rounded border p-4">
+    <section className="quote-sidebar-card">
       <div className="mb-4">
-        <h2 className="font-semibold">Offerte e-mailen</h2>
-        <p className="text-sm text-gray-600">
+        <h2 className="section-heading">Mailen naar de klant</h2>
+        <p className="text-sm font-medium text-muted">
           Via {connectedMailbox.provider === 'gmail' ? 'Gmail' : 'Outlook'} · {connectedMailbox.email_address}
         </p>
       </div>
 
       <form onSubmit={send} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="label flex flex-col gap-2">
           Aan
           <input
             type="email"
             required
             value={recipient}
             onChange={(event) => setRecipient(event.target.value)}
-            className="rounded border p-3"
+            className="field"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="label flex flex-col gap-2">
           Onderwerp
           <input
             required
             maxLength={200}
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
-            className="rounded border p-3"
+            className="field"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="label flex flex-col gap-2">
           Bericht
           <textarea
             required
@@ -111,21 +112,21 @@ export default function EmailQuoteForm({ quote, companyName, mailbox }: Props) {
             maxLength={10_000}
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            className="rounded border p-3"
+            className="field"
           />
         </label>
 
-        <p className="text-xs text-gray-500">De offerte-pdf wordt automatisch toegevoegd.</p>
+        <p className="text-xs font-semibold text-muted">De offerte-pdf wordt automatisch toegevoegd.</p>
 
-        {error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        {success && <p role="status" className="rounded bg-green-50 p-3 text-sm text-green-800">{success}</p>}
+        {error && <p role="alert" className="alert alert-critical">{error}</p>}
+        {success && <p role="status" className="alert alert-success">{success}</p>}
 
         <button
           type="submit"
           disabled={busy}
-          className="rounded bg-black p-3 text-white disabled:opacity-50"
+          className="btn btn-primary"
         >
-          {busy ? 'Versturen…' : 'Offerte versturen'}
+          <Icon name="mail" size={21} /> {busy ? 'Versturen…' : 'Offerte versturen'}
         </button>
       </form>
     </section>

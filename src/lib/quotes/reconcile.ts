@@ -29,18 +29,57 @@ function significantTerms(name: string): string[] {
     .filter((term) => term.length >= 4 && !STOP_WORDS.has(term));
 }
 
+function editDistance(left: string, right: string): number {
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let diagonal = row[0];
+    row[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const above = row[rightIndex];
+      row[rightIndex] = left[leftIndex - 1] === right[rightIndex - 1]
+        ? diagonal
+        : Math.min(diagonal + 1, row[rightIndex] + 1, row[rightIndex - 1] + 1);
+      diagonal = above;
+    }
+  }
+  return row[right.length];
+}
+
+function termsMatch(catalogTerm: string, spokenTerm: string): boolean {
+  if (catalogTerm === spokenTerm) return true;
+  // Short words are too ambiguous for fuzzy matching. For longer trade terms,
+  // one or two ASR spelling errors ("dakpannen" → "dekpannen") are safe to
+  // recover without asking the model to guess a price.
+  if (catalogTerm.length < 5 || spokenTerm.length < 5) return false;
+  const maxDistance = Math.max(1, Math.floor(Math.min(catalogTerm.length, spokenTerm.length) * 0.2));
+  return editDistance(catalogTerm, spokenTerm) <= maxDistance;
+}
+
+function findTermInText(text: string, term: string): { term: string; index: number } | null {
+  const exactIndex = text.indexOf(term);
+  if (exactIndex >= 0) return { term, index: exactIndex };
+
+  for (const match of text.matchAll(/[a-z0-9²]+/g)) {
+    const spokenTerm = match[0];
+    if (termsMatch(term, spokenTerm)) {
+      return { term: spokenTerm, index: match.index ?? 0 };
+    }
+  }
+  return null;
+}
+
 function findCatalogMention(transcript: string, item: CatalogItem): { term: string; index: number } | null {
   const text = normalize(transcript);
   for (const term of significantTerms(item.name)) {
-    const index = text.indexOf(term);
-    if (index >= 0) return { term, index };
+    const mention = findTermInText(text, term);
+    if (mention) return mention;
   }
   return null;
 }
 
 function findCatalogMatch(description: string, catalog: CatalogItem[]): CatalogItem | undefined {
   const text = normalize(description);
-  return catalog.find((item) => significantTerms(item.name).some((term) => text.includes(term)));
+  return catalog.find((item) => significantTerms(item.name).some((term) => findTermInText(text, term)));
 }
 
 function nearbyQuantity(transcript: string, mention: { term: string; index: number }): number | null {

@@ -42,7 +42,7 @@ export default function PipelineStagesForm({ stages }: { stages: PipelineStage[]
           </li>
         )}
         {sorted.map((stage, index) => (
-          <li key={stage.id} className="card flex items-center gap-2">
+          <li key={stage.id} className="card flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex flex-col">
               <button
                 type="button"
@@ -66,7 +66,7 @@ export default function PipelineStagesForm({ stages }: { stages: PipelineStage[]
 
             <form
               action={(form) => void handleRename(stage.id, form)}
-              className="flex flex-1 items-center gap-2"
+              className="flex flex-1 flex-col gap-2 sm:flex-row"
             >
               <input name="name" defaultValue={stage.name} className="field" />
               <button type="submit" className="btn btn-outline text-sm">Opslaan</button>
@@ -76,7 +76,7 @@ export default function PipelineStagesForm({ stages }: { stages: PipelineStage[]
               type="button"
               onClick={() => void handleDelete(stage.id)}
               aria-label={`Verwijder ${stage.name}`}
-              className="text-sm font-medium text-critical underline underline-offset-2"
+              className="min-h-11 text-sm font-bold text-critical underline underline-offset-2"
             >
               Verwijderen
             </button>

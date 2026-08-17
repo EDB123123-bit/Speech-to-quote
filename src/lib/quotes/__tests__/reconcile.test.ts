@@ -27,6 +27,15 @@ describe('reconcileExtraction', () => {
     expect(result.clarifications).toEqual([]);
   });
 
+  it('recovers a catalog item when speech recognition makes a small spelling error', () => {
+    const result = reconcileExtraction('20 vierkante meter dekpannen', empty, catalog);
+
+    expect(result.tasks).toContainEqual({
+      catalogItemId: 'roof-tiles', description: 'Dakpannen leggen', quantity: 20, unit: 'm²',
+    });
+    expect(result.clarifications).toEqual([]);
+  });
+
   it('adds a clarification when a catalog item is mentioned without a quantity', () => {
     const result = reconcileExtraction('We moeten ramen plaatsen', empty, catalog);
 

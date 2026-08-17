@@ -93,7 +93,10 @@ export default function OnboardingTour() {
       setRect(null);
       return;
     }
-    const el = document.querySelector(step.selector);
+    const el = Array.from(document.querySelectorAll(step.selector)).find((candidate) => {
+      const box = candidate.getBoundingClientRect();
+      return box.width > 0 && box.height > 0;
+    });
     if (!el) {
       setRect(null);
       return;

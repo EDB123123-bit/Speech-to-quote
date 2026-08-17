@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireContractor, UnauthorizedError } from '@/lib/auth/require-contractor';
-import { transcribeAudio } from '@/lib/ai/transcribe';
-import { extractQuoteTasks } from '@/lib/ai/extract';
+import { transcribeAudio, TranscriptionError } from '@/lib/ai/transcribe';
+import { extractQuoteTasks, ExtractionError } from '@/lib/ai/extract';
 import { logPipelineEvent } from '@/lib/logging/pipeline-events';
 import { generateQuote, EmptyCatalogError, PartialQuoteError, type GenerateDeps } from '@/lib/quotes/generate';
 import type { CatalogItem } from '@/lib/supabase/types';
@@ -24,6 +24,13 @@ export async function POST(request: Request) {
     throw error;
   }
 
+  if (!process.env.OPENAI_API_KEY || !process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json(
+      { error: 'Spraakverwerking is nog niet ingesteld. Voeg de OpenAI- en Anthropic-sleutel toe aan .env.local.' },
+      { status: 503 },
+    );
+  }
+
   const form = await request.formData();
   const audio = form.get('audio');
   if (!(audio instanceof File) || audio.size === 0) {
@@ -32,7 +39,8 @@ export async function POST(request: Request) {
 
   const deps: GenerateDeps = {
     loadCatalog: async () => {
-      const { data } = await supabase.from('catalog_items').select('*');
+      const { data, error } = await supabase.from('catalog_items').select('*');
+      if (error) throw new Error(`Prijslijst laden mislukt: ${error.message}`);
       return (data ?? []) as CatalogItem[];
     },
     uploadAudio: async (id, file) => {
@@ -47,7 +55,7 @@ export async function POST(request: Request) {
         .insert({ contractor_id: id, audio_path: audioPath, status: 'draft' })
         .select('id')
         .single();
-      if (error || !data) throw new Error('Aanmaken van offerte mislukt');
+      if (error || !data) throw new Error(`Aanmaken van offerte mislukt${error ? `: ${error.message}` : ''}`);
       return data.id as string;
     },
     transcribe: transcribeAudio,
@@ -77,13 +85,23 @@ export async function POST(request: Request) {
     const { quoteId } = await generateQuote(deps, { audio, contractorId });
     return NextResponse.json({ quoteId }, { status: 201 });
   } catch (error) {
+    console.error('[quotes/generate] verwerking mislukt', error);
+    if (error instanceof TranscriptionError) {
+      return NextResponse.json(
+        { error: 'Transcriptie mislukt. Controleer je OpenAI-verbinding en probeer opnieuw.' },
+        { status: 502 },
+      );
+    }
     if (error instanceof EmptyCatalogError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     if (error instanceof PartialQuoteError) {
+      const extractionFailed = error.stage === 'extract' || error.cause instanceof ExtractionError;
       return NextResponse.json(
         {
-          error: 'Automatische verwerking mislukt. Je kan de offertelijnen handmatig toevoegen.',
+          error: extractionFailed
+            ? 'De opname is bewaard. De prijslijst kon nog niet automatisch worden toegepast; probeer opnieuw.'
+            : 'De opname is bewaard, maar kon nog niet worden uitgeschreven. Probeer opnieuw.',
           quoteId: error.quoteId,
         },
         { status: 500 },

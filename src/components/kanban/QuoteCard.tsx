@@ -27,10 +27,10 @@ export default function QuoteCard({ quote, column, stages, onMove, busy }: Props
     : undefined;
 
   return (
-    <div ref={setNodeRef} style={style} className="card flex flex-col gap-2">
+    <article ref={setNodeRef} style={style} className="card flex flex-col gap-3 shadow-[0_5px_16px_rgba(58,42,28,0.05)]">
       <div className="flex items-start justify-between gap-2">
         <Link href={`/offertes/${quote.id}`} className="flex-1 hover:text-accent">
-          <p className="font-medium">{quote.customer_name ?? 'Zonder klantnaam'}</p>
+          <p className="text-lg font-extrabold">{quote.customer_name ?? 'Zonder klantnaam'}</p>
           <p className="nums text-sm text-muted">
             {new Date(quote.created_at).toLocaleDateString('nl-BE')}
           </p>
@@ -47,21 +47,21 @@ export default function QuoteCard({ quote, column, stages, onMove, busy }: Props
         </button>
       </div>
 
-      <p className="nums text-right font-medium">{formatEuros(quote.grandTotalCents)}</p>
+      <p className="nums text-right text-lg font-extrabold">{formatEuros(quote.grandTotalCents)}</p>
 
       {targets.length > 0 && (
         <details className="relative">
-          <summary className="cursor-pointer text-sm text-muted hover:text-ink">
+          <summary className="cursor-pointer text-sm font-bold text-muted hover:text-ink">
             Verplaats naar…
           </summary>
-          <ul className="card absolute right-0 z-20 mt-1 w-48 gap-1 p-2">
+          <ul className="card absolute right-0 z-20 mt-1 w-52 gap-1 p-2 shadow-[var(--shadow)]">
             {targets.map((t) => (
               <li key={t.label}>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => onMove(t.target)}
-                  className="w-full rounded px-2 py-1 text-left text-sm hover:bg-paper disabled:opacity-50"
+                  className="min-h-11 w-full rounded-xl px-3 py-2 text-left text-sm font-bold hover:bg-paper disabled:opacity-50"
                 >
                   {t.label}
                 </button>
@@ -70,6 +70,6 @@ export default function QuoteCard({ quote, column, stages, onMove, busy }: Props
           </ul>
         </details>
       )}
-    </div>
+    </article>
   );
 }

@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { requireContractor } from '@/lib/auth/require-contractor';
 import { getMailboxSummary } from '@/lib/mailbox/connection';
 import DeleteQuoteButton from '@/components/DeleteQuoteButton';
 import QuoteEditor from './QuoteEditor';
 import type { Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
+import Icon from '@/components/ui/Icon';
 
 export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,25 +20,34 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   if (!quote) notFound();
 
+  const typedQuote = quote as Quote;
+
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <h1 className="mb-2 text-3xl font-semibold">
-        Offerte {(quote as Quote).id.split('-')[0].toUpperCase()}
-      </h1>
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <span className={`badge inline-flex ${(quote as Quote).status === 'final' ? 'badge-success' : 'badge-neutral'}`}>
-          {(quote as Quote).status === 'final' ? 'Afgewerkt' : 'Concept'}
+    <main className="page-shell">
+      <Link href="/offertes" className="back-link"><Icon name="arrow-left" /> Terug naar offertes</Link>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="eyebrow">{typedQuote.status === 'final' ? 'Afgewerkte offerte' : 'Concept nakijken'}</p>
+          <h1 className="page-title">{typedQuote.customer_name ?? `Offerte ${typedQuote.id.split('-')[0].toUpperCase()}`}</h1>
+          <p className="page-subtitle">
+            {typedQuote.status === 'final' ? 'Klaar om te versturen' : 'Controleer de werken, prijzen en klantgegevens.'}
+          </p>
+        </div>
+        <span className={`badge ${typedQuote.status === 'final' ? 'badge-success' : 'badge-neutral'}`}>
+          {typedQuote.status === 'final' ? 'Afgewerkt' : 'Concept'}
         </span>
-        <DeleteQuoteButton quoteId={(quote as Quote).id} redirectTo="/offertes" />
-      </div>
+      </header>
 
       <QuoteEditor
-        quote={quote as Quote}
+        quote={typedQuote}
         initialLineItems={(lineItems ?? []) as QuoteLineItem[]}
         initialClarifications={(clarifications ?? []) as QuoteClarification[]}
         mailbox={mailbox}
         companyName={contractor.company_name}
       />
+      <div className="mt-7 flex justify-end">
+        <DeleteQuoteButton quoteId={typedQuote.id} redirectTo="/offertes" />
+      </div>
     </main>
   );
 }

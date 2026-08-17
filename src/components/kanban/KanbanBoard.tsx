@@ -14,7 +14,7 @@ type Column = { key: string; label: string; target: MoveTarget; quotes: QuoteWit
 function Droppable({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef } = useDroppable({ id });
   return (
-    <div ref={setNodeRef} className="flex min-h-[200px] w-72 shrink-0 flex-col gap-3 rounded-2xl border border-border bg-paper p-3">
+    <div ref={setNodeRef} className="flex min-h-[220px] w-[min(82vw,19rem)] shrink-0 flex-col gap-3 rounded-3xl bg-[var(--paper-strong)] p-3">
       {children}
     </div>
   );
@@ -83,10 +83,10 @@ export default function KanbanBoard({
       {error && <p role="alert" className="alert alert-critical">{error}</p>}
 
       <DndContext onDragEnd={onDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex snap-x gap-4 overflow-x-auto pb-5">
           {columns.map((column) => (
-            <div key={column.key} className="flex flex-col gap-2">
-              <h2 className="label">
+            <div key={column.key} className="flex snap-start flex-col gap-2">
+              <h2 className="px-2 text-base font-extrabold">
                 {column.label} <span className="nums">({column.quotes.length})</span>
               </h2>
               <Droppable id={column.key}>

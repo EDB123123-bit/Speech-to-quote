@@ -1,5 +1,5 @@
 import { expandTasksToLineItems, type NewLineItem } from '@/lib/quotes/expand';
-import { reconcileExtraction } from '@/lib/quotes/reconcile';
+import { extractWithCatalogFallback } from '@/lib/quotes/extract-with-fallback';
 import type { ExtractionResult } from '@/lib/ai/schemas';
 import type { CatalogItem, PipelineStep } from '@/lib/supabase/types';
 
@@ -13,10 +13,12 @@ export class EmptyCatalogError extends Error {
 /** Thrown when a draft exists but extraction failed — the caller needs the id. */
 export class PartialQuoteError extends Error {
   quoteId: string;
-  constructor(message: string, quoteId: string, options?: { cause?: unknown }) {
+  stage: PipelineStep;
+  constructor(message: string, quoteId: string, stage: PipelineStep, options?: { cause?: unknown }) {
     super(message, options);
     this.name = 'PartialQuoteError';
     this.quoteId = quoteId;
+    this.stage = stage;
   }
 }
 
@@ -75,7 +77,7 @@ export async function generateQuote(
     });
   } catch (error) {
     await deps.log({ quoteId, contractorId, step: 'transcribe', status: 'error', detail: errorDetail(error) });
-    throw error;
+    throw new PartialQuoteError('Transcriptie mislukt', quoteId, 'transcribe', { cause: error });
   }
 
   // Not a distinct pipeline step in its own right — logged under 'transcribe'
@@ -88,26 +90,44 @@ export async function generateQuote(
       quoteId, contractorId, step: 'transcribe', status: 'error',
       detail: { phase: 'save_transcript', ...errorDetail(error) },
     });
-    throw error;
+    throw new PartialQuoteError('Opslaan van transcript mislukt', quoteId, 'transcribe', { cause: error });
   }
 
   // --- extract ------------------------------------------------------------
   let extraction: ExtractionResult;
   try {
-    extraction = reconcileExtraction(transcript, await deps.extract(transcript, catalog), catalog);
+    const outcome = await extractWithCatalogFallback({ transcript, catalog, extract: deps.extract });
+    extraction = outcome.extraction;
     await deps.log({
-      quoteId, contractorId, step: 'extract', status: 'success',
-      detail: { taskCount: extraction.tasks.length, clarificationCount: extraction.clarifications.length },
+      quoteId,
+      contractorId,
+      step: 'extract',
+      status: outcome.usedFallback ? 'error' : 'success',
+      detail: {
+        taskCount: extraction.tasks.length,
+        clarificationCount: extraction.clarifications.length,
+        usedFallback: outcome.usedFallback,
+        ...(outcome.error ? errorDetail(outcome.error) : {}),
+      },
     });
   } catch (error) {
     await deps.log({ quoteId, contractorId, step: 'extract', status: 'error', detail: errorDetail(error) });
-    // The draft survives: the contractor can still build the quote by hand
-    // rather than losing the recording they just made.
-    throw new PartialQuoteError('Automatische verwerking mislukt', quoteId, { cause: error });
+    throw new PartialQuoteError('Automatische verwerking mislukt', quoteId, 'extract', { cause: error });
   }
 
-  await deps.saveLineItems(quoteId, expandTasksToLineItems(extraction.tasks, catalog));
-  await deps.saveClarifications(quoteId, extraction.clarifications);
+  try {
+    await deps.saveLineItems(quoteId, expandTasksToLineItems(extraction.tasks, catalog));
+    await deps.saveClarifications(quoteId, extraction.clarifications);
+  } catch (error) {
+    await deps.log({
+      quoteId,
+      contractorId,
+      step: 'extract',
+      status: 'error',
+      detail: { phase: 'persist_result', ...errorDetail(error) },
+    });
+    throw new PartialQuoteError('Offertelijnen opslaan mislukt', quoteId, 'extract', { cause: error });
+  }
 
   return { quoteId };
 }

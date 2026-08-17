@@ -101,6 +101,31 @@ describe('extractQuoteTasks', () => {
     });
   });
 
+  it('finds the JSON when Anthropic prepends a non-text content block', async () => {
+    impl = async () => ({
+      content: [
+        { type: 'thinking', thinking: 'Ik koppel de werken aan de prijslijst.' },
+        { type: 'text', text: '{"tasks":[],"clarifications":[]}' },
+      ],
+    });
+
+    await expect(extractQuoteTasks('x', catalog)).resolves.toEqual({
+      tasks: [],
+      clarifications: [],
+    });
+  });
+
+  it('recovers JSON surrounded by a short model preamble', async () => {
+    impl = async () => ({
+      content: [{ type: 'text', text: 'Hier is de offerteanalyse:\n{"tasks":[],"clarifications":[]}' }],
+    });
+
+    await expect(extractQuoteTasks('x', catalog)).resolves.toEqual({
+      tasks: [],
+      clarifications: [],
+    });
+  });
+
   it('retries once when the first response is malformed', async () => {
     impl = async () => {
       if (callCount === 1) {
@@ -116,10 +141,10 @@ describe('extractQuoteTasks', () => {
     expect(callCount).toBe(2);
   });
 
-  it('throws ExtractionError when both attempts are malformed', async () => {
+  it('throws ExtractionError when all attempts are malformed', async () => {
     impl = async () => ({ content: [{ type: 'text', text: 'nog steeds geen JSON' }] });
     await expect(extractQuoteTasks('x', catalog)).rejects.toBeInstanceOf(ExtractionError);
-    expect(callCount).toBe(2);
+    expect(callCount).toBe(3);
   });
 
   it('throws ExtractionError when the API call itself fails', async () => {

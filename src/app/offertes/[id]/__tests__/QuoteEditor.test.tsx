@@ -145,4 +145,16 @@ describe('QuoteEditor', () => {
       expect(screen.getByDisplayValue('Nieuw item – materiaal')).toBeInTheDocument(),
     );
   });
+
+  it('offers to reapply the catalog when extraction produced an empty draft', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, lineItemCount: 2 }),
+    });
+
+    render(<QuoteEditor quote={quote} initialLineItems={[]} initialClarifications={[]} />);
+    await userEvent.click(screen.getByRole('button', { name: /prijslijst opnieuw toepassen/i }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/quotes/quote-1/retry', { method: 'POST' }));
+  });
 });

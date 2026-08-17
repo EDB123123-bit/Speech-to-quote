@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireContractor } from '@/lib/auth/require-contractor';
+import { disconnectMailboxConnection } from '@/lib/mailbox/connection';
 import { parseProfileInput } from './parse';
 
 export async function saveProfile(form: FormData): Promise<void> {
@@ -11,5 +12,11 @@ export async function saveProfile(form: FormData): Promise<void> {
   const { error } = await supabase.from('contractors').update(input).eq('id', contractor.id);
   if (error) throw new Error('Opslaan mislukt. Probeer opnieuw.');
 
+  revalidatePath('/instellingen');
+}
+
+export async function disconnectMailbox(): Promise<void> {
+  const { contractor } = await requireContractor();
+  await disconnectMailboxConnection(contractor.id);
   revalidatePath('/instellingen');
 }

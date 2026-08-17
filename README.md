@@ -14,6 +14,12 @@ Copy `.env.example` to `.env.local` and fill in:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (client + server). |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key — used by the browser and by server routes acting as the signed-in contractor (RLS-scoped). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key. Bypasses RLS — used only for writing `pipeline_events` and for the audio-cleanup cron job. Server-only, never expose to the browser. |
+| `APP_URL` | Public production URL without a trailing slash. Used to build OAuth callback URLs. |
+| `GOOGLE_CLIENT_ID` | Google OAuth web client ID for Gmail sending. |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth web client secret. Server-only. |
+| `AZURE_CLIENT_ID` | Microsoft Entra application (client) ID for Outlook sending. |
+| `AZURE_CLIENT_SECRET` | Microsoft Entra client secret. Server-only. |
+| `AZURE_TENANT_ID` | Microsoft tenant ID, or `common` to support work, school, and personal accounts. |
 | `OPENAI_API_KEY` | Whisper transcription and TTS. |
 | `ANTHROPIC_API_KEY` | Claude extraction (matching spoken tasks to catalog items). |
 | `EXTRACTION_MODEL` | Claude model id used for extraction, e.g. `claude-sonnet-5`. |
@@ -38,6 +44,33 @@ supabase db push
 
 or apply each file's SQL directly via the Supabase SQL editor / MCP `apply_migration` if
 you're not using the CLI. Always apply migrations in filename order.
+
+## Mailbox setup
+
+The settings page lets each contractor connect one Gmail or Outlook mailbox. OAuth tokens
+are stored in `mailbox_connections`, which has RLS enabled and grants no access to browser
+roles; only authenticated server routes using the service-role client can access them.
+
+### Gmail
+
+1. Create a Web application OAuth client in Google Cloud and enable the Gmail API.
+2. Configure the OAuth consent screen with the `openid`, `email`, and
+   `https://www.googleapis.com/auth/gmail.send` scopes.
+3. Add this exact authorized redirect URI:
+   `<APP_URL>/api/mailbox/connect/gmail`.
+4. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Vercel.
+
+### Outlook / Microsoft 365
+
+1. Register a Web application in Microsoft Entra ID.
+2. Add delegated Microsoft Graph permissions `Mail.Send` and `User.Read`.
+3. Add this exact Web redirect URI:
+   `<APP_URL>/api/mailbox/connect/outlook`.
+4. Create a client secret and set `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, and
+   `AZURE_TENANT_ID` in Vercel.
+
+Both providers also request offline access so expired access tokens can be refreshed without
+interrupting the contractor. The app does not request inbox-reading permissions.
 
 ## Running locally
 

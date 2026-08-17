@@ -5,17 +5,26 @@ import { useRouter } from 'next/navigation';
 import LineItemsEditor from '@/components/LineItemsEditor';
 import ClarificationPanel from '@/components/ClarificationPanel';
 import CustomerForm from '@/components/CustomerForm';
+import EmailQuoteForm from '@/components/EmailQuoteForm';
 import { checkFinalizeGate } from '@/lib/quotes/finalize-gate';
 import { updateLineItem, addLineItem } from '@/app/offertes/[id]/line-item-actions';
-import type { LineType, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
+import type { LineType, MailboxSummary, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
 type Props = {
   quote: Quote;
   initialLineItems: QuoteLineItem[];
   initialClarifications: QuoteClarification[];
+  mailbox?: MailboxSummary | null;
+  companyName?: string;
 };
 
-export default function QuoteEditor({ quote, initialLineItems, initialClarifications }: Props) {
+export default function QuoteEditor({
+  quote,
+  initialLineItems,
+  initialClarifications,
+  mailbox = null,
+  companyName = 'je bedrijf',
+}: Props) {
   const router = useRouter();
   const [lineItems, setLineItems] = useState(initialLineItems);
   const [blockerMessages, setBlockerMessages] = useState<string[]>([]);
@@ -153,12 +162,15 @@ export default function QuoteEditor({ quote, initialLineItems, initialClarificat
       )}
 
       {isFinal ? (
-        <a
-          href={`/api/quotes/${quote.id}/pdf`}
-          className="btn btn-accent w-full"
-        >
-          Pdf downloaden
-        </a>
+        <>
+          <a
+            href={`/api/quotes/${quote.id}/pdf`}
+            className="btn btn-accent w-full"
+          >
+            Pdf downloaden
+          </a>
+          <EmailQuoteForm quote={quote} companyName={companyName} mailbox={mailbox} />
+        </>
       ) : (
         <button
           type="button"

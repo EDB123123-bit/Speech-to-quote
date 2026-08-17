@@ -15,7 +15,29 @@ export type PipelineStep =
   | 'clarification_answer'
   | 'tts_generate'
   | 'pdf_generate'
-  | 'audio_cleanup';
+  | 'audio_cleanup'
+  | 'email_send';
+
+export type MailboxProvider = 'gmail' | 'outlook';
+export type MailboxStatus = 'connected' | 'disconnected';
+
+export type MailboxConnection = {
+  id: string;
+  user_id: string;
+  provider: MailboxProvider;
+  access_token: string;
+  refresh_token: string;
+  email_address: string;
+  token_expires_at: string;
+  status: MailboxStatus;
+  connected_at: string;
+  updated_at: string;
+};
+
+export type MailboxSummary = Pick<
+  MailboxConnection,
+  'provider' | 'email_address' | 'status' | 'connected_at'
+>;
 
 export type Contractor = {
   id: string;

@@ -1,16 +1,18 @@
 import { notFound } from 'next/navigation';
 import { requireContractor } from '@/lib/auth/require-contractor';
+import { getMailboxSummary } from '@/lib/mailbox/connection';
 import QuoteEditor from './QuoteEditor';
 import type { Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
 export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireContractor();
+  const { supabase, contractor } = await requireContractor();
 
-  const [{ data: quote }, { data: lineItems }, { data: clarifications }] = await Promise.all([
+  const [{ data: quote }, { data: lineItems }, { data: clarifications }, mailbox] = await Promise.all([
     supabase.from('quotes').select('*').eq('id', id).single(),
     supabase.from('quote_line_items').select('*').eq('quote_id', id).order('sort_order'),
     supabase.from('quote_clarifications').select('*').eq('quote_id', id).order('created_at'),
+    getMailboxSummary(contractor.id),
   ]);
 
   if (!quote) notFound();
@@ -28,6 +30,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         quote={quote as Quote}
         initialLineItems={(lineItems ?? []) as QuoteLineItem[]}
         initialClarifications={(clarifications ?? []) as QuoteClarification[]}
+        mailbox={mailbox}
+        companyName={contractor.company_name}
       />
     </main>
   );

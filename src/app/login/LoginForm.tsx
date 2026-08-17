@@ -25,7 +25,10 @@ export default function LoginForm() {
         : await supabase.auth.signUp({
             email,
             password,
-            options: { data: { company_name: companyName } },
+            options: {
+              data: { company_name: companyName },
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
           });
 
     setBusy(false);
@@ -38,49 +41,49 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="card flex flex-col gap-4">
       {mode === 'signup' && (
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Bedrijfsnaam</span>
+          <span className="label">Bedrijfsnaam</span>
           <input
             required
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
-            className="rounded border p-3"
+            className="field"
           />
         </label>
       )}
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">E-mailadres</span>
+        <span className="label">E-mailadres</span>
         <input
           required
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded border p-3"
+          className="field"
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Wachtwoord</span>
+        <span className="label">Wachtwoord</span>
         <input
           required
           type="password"
           minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded border p-3"
+          className="field"
         />
       </label>
 
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="alert alert-critical">{error}</p>}
 
-      <button type="submit" disabled={busy} className="rounded bg-black p-3 text-white disabled:opacity-50">
+      <button type="submit" disabled={busy} className="btn btn-accent">
         {busy ? 'Bezig…' : mode === 'login' ? 'Aanmelden' : 'Account aanmaken'}
       </button>
       <button
         type="button"
         onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-        className="text-sm underline"
+        className="text-sm font-medium text-muted underline underline-offset-2 hover:text-ink"
       >
         {mode === 'login' ? 'Nog geen account? Registreer je hier.' : 'Al een account? Meld je aan.'}
       </button>

@@ -17,6 +17,7 @@ const quote: Quote = {
   audio_path: null,
   audio_deleted_at: null,
   pdf_path: 'contractor-1/quote.pdf',
+  pipeline_stage_id: null,
   created_at: '2026-08-16T12:00:00Z',
 };
 

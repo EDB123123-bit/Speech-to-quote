@@ -8,7 +8,7 @@ import CustomerForm from '@/components/CustomerForm';
 import EmailQuoteForm from '@/components/EmailQuoteForm';
 import { checkFinalizeGate } from '@/lib/quotes/finalize-gate';
 import { updateLineItem, addLineItem } from '@/app/offertes/[id]/line-item-actions';
-import type { MailboxSummary, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
+import type { LineType, MailboxSummary, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
 type Props = {
   quote: Quote;
@@ -29,6 +29,7 @@ export default function QuoteEditor({
   const [lineItems, setLineItems] = useState(initialLineItems);
   const [blockerMessages, setBlockerMessages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [addingLineType, setAddingLineType] = useState<LineType | null>(null);
   // Set when a line item edit fails to persist to the database. The PDF is
   // rendered server-side from the DB, so an unsaved edit that the contractor
   // thinks succeeded must block finalizing rather than fail silently.
@@ -87,12 +88,26 @@ export default function QuoteEditor({
     }
   }
 
+  async function addLine(lineType: LineType) {
+    setAddingLineType(lineType);
+    setSaveFailed(false);
+
+    try {
+      const item = await addLineItem(quote.id, lineType);
+      setLineItems((current) => [...current, item]);
+    } catch {
+      setSaveFailed(true);
+    } finally {
+      setAddingLineType(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {quote.transcript && (
-        <details className="rounded border p-3 text-sm">
-          <summary className="cursor-pointer font-medium">Wat ik gehoord heb</summary>
-          <p className="mt-2 text-gray-700">{quote.transcript}</p>
+        <details className="card text-sm">
+          <summary className="cursor-pointer font-medium text-muted">Wat ik gehoord heb</summary>
+          <p className="mt-3 text-ink">{quote.transcript}</p>
         </details>
       )}
 
@@ -112,31 +127,19 @@ export default function QuoteEditor({
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              onClick={() =>
-                void addLineItem(quote.id, 'materials')
-                  .then(() => {
-                    setSaveFailed(false);
-                    router.refresh();
-                  })
-                  .catch(() => setSaveFailed(true))
-              }
-              className="rounded border px-3 py-2 text-sm"
+              onClick={() => void addLine('materials')}
+              disabled={addingLineType !== null}
+              className="btn btn-outline"
             >
-              + Materiaal toevoegen
+              {addingLineType === 'materials' ? 'Bezig…' : '+ Materiaal toevoegen'}
             </button>
             <button
               type="button"
-              onClick={() =>
-                void addLineItem(quote.id, 'labor')
-                  .then(() => {
-                    setSaveFailed(false);
-                    router.refresh();
-                  })
-                  .catch(() => setSaveFailed(true))
-              }
-              className="rounded border px-3 py-2 text-sm"
+              onClick={() => void addLine('labor')}
+              disabled={addingLineType !== null}
+              className="btn btn-outline"
             >
-              + Arbeid toevoegen
+              {addingLineType === 'labor' ? 'Bezig…' : '+ Arbeid toevoegen'}
             </button>
           </div>
         )}
@@ -145,13 +148,13 @@ export default function QuoteEditor({
       {!isFinal && <CustomerForm quote={quote} />}
 
       {saveFailed && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <p role="alert" className="alert alert-critical">
           Een offertelijn kon niet opgeslagen worden. Controleer je verbinding en probeer opnieuw.
         </p>
       )}
 
       {blockerMessages.length > 0 && (
-        <ul role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <ul role="alert" className="alert alert-critical flex-col">
           {blockerMessages.map((message) => (
             <li key={message}>{message}</li>
           ))}
@@ -162,7 +165,7 @@ export default function QuoteEditor({
         <>
           <a
             href={`/api/quotes/${quote.id}/pdf`}
-            className="rounded bg-black p-4 text-center text-white"
+            className="btn btn-accent w-full"
           >
             Pdf downloaden
           </a>
@@ -173,14 +176,14 @@ export default function QuoteEditor({
           type="button"
           onClick={() => void finalize()}
           disabled={busy || blockers.length > 0 || saveFailed}
-          className="rounded bg-black p-4 text-white disabled:opacity-50"
+          className="btn btn-primary w-full"
         >
           {busy ? 'Bezig…' : 'Offerte afwerken'}
         </button>
       )}
 
       {!isFinal && blockers.length > 0 && (
-        <ul className="text-sm text-gray-600">
+        <ul className="text-sm text-muted">
           {blockers.map((blocker) => (
             <li key={blocker.code}>• {blocker.messageNl}</li>
           ))}

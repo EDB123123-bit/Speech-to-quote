@@ -13,14 +13,14 @@ export default function CustomerForm({ quote }: { quote: Quote }) {
   }
 
   return (
-    <form action={action} className="flex flex-col gap-3 rounded border p-4">
+    <form action={action} className="card flex flex-col gap-3">
       <h2 className="font-semibold">Klantgegevens</h2>
-      <input name="customer_name" required defaultValue={quote.customer_name ?? ''} placeholder="Naam klant" className="rounded border p-3" />
-      <input name="customer_address" required defaultValue={quote.customer_address ?? ''} placeholder="Adres" className="rounded border p-3" />
-      <input name="customer_email" type="email" defaultValue={quote.customer_email ?? ''} placeholder="E-mailadres (optioneel)" className="rounded border p-3" />
-      <input name="customer_phone" defaultValue={quote.customer_phone ?? ''} placeholder="Telefoon (optioneel)" className="rounded border p-3" />
-      <button type="submit" className="rounded bg-black p-3 text-white">Klantgegevens opslaan</button>
-      {saved && <p className="text-sm text-green-700">Opgeslagen.</p>}
+      <input name="customer_name" required defaultValue={quote.customer_name ?? ''} placeholder="Naam klant" className="field" />
+      <input name="customer_address" required defaultValue={quote.customer_address ?? ''} placeholder="Adres" className="field" />
+      <input name="customer_email" type="email" defaultValue={quote.customer_email ?? ''} placeholder="E-mailadres (optioneel)" className="field" />
+      <input name="customer_phone" defaultValue={quote.customer_phone ?? ''} placeholder="Telefoon (optioneel)" className="field" />
+      <button type="submit" className="btn btn-primary">Klantgegevens opslaan</button>
+      {saved && <p className="text-sm font-medium text-success">Opgeslagen.</p>}
     </form>
   );
 }

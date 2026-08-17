@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireContractor, UnauthorizedError } from '@/lib/auth/require-contractor';
-import { checkFinalizeGate } from '@/lib/quotes/finalize-gate';
+import { finalizeQuote, type FinalizeDeps } from '@/lib/quotes/finalize';
 import { renderQuotePdf } from '@/lib/pdf/render';
 import { logPipelineEvent } from '@/lib/logging/pipeline-events';
 import type { Contractor, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
@@ -20,68 +20,48 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     throw error;
   }
 
-  const [{ data: quote }, { data: lineItems }, { data: clarifications }] = await Promise.all([
-    supabase.from('quotes').select('*').eq('id', id).single(),
-    supabase.from('quote_line_items').select('*').eq('quote_id', id),
-    supabase.from('quote_clarifications').select('*').eq('quote_id', id),
-  ]);
+  const deps: FinalizeDeps = {
+    loadQuote: async (quoteId) => {
+      const { data } = await supabase.from('quotes').select('*').eq('id', quoteId).single();
+      return data as Quote | null;
+    },
+    loadLineItems: async (quoteId) => {
+      const { data } = await supabase.from('quote_line_items').select('*').eq('quote_id', quoteId);
+      return (data ?? []) as QuoteLineItem[];
+    },
+    loadClarifications: async (quoteId) => {
+      const { data } = await supabase.from('quote_clarifications').select('*').eq('quote_id', quoteId);
+      return (data ?? []) as QuoteClarification[];
+    },
+    updateStatusToFinal: async (quoteId) => {
+      const { error } = await supabase
+        .from('quotes').update({ status: 'final' }).eq('id', quoteId).eq('status', 'draft');
+      if (error) throw new Error(error.message);
+    },
+    loadContractor: async (contractorId) => {
+      const { data } = await supabase.from('contractors').select('*').eq('id', contractorId).single();
+      return data as Contractor | null;
+    },
+    renderPdf: renderQuotePdf,
+    uploadPdf: async (path, pdf) => {
+      const { error } = await supabase.storage
+        .from('quote-pdfs').upload(path, pdf, { contentType: 'application/pdf', upsert: true });
+      if (error) throw new Error(error.message);
+    },
+    savePdfPath: async (quoteId, path) => {
+      const { error } = await supabase.from('quotes').update({ pdf_path: path }).eq('id', quoteId);
+      if (error) throw new Error(error.message);
+    },
+    log: logPipelineEvent,
+  };
 
-  if (!quote) return NextResponse.json({ error: 'Offerte niet gevonden' }, { status: 404 });
+  const result = await finalizeQuote(deps, id);
 
-  const blockers = checkFinalizeGate({
-    quote: quote as Quote,
-    lineItems: (lineItems ?? []) as QuoteLineItem[],
-    clarifications: (clarifications ?? []) as QuoteClarification[],
-  });
-
-  if (blockers.length > 0) {
-    return NextResponse.json({ blockers }, { status: 422 });
+  if (!result.ok && 'status' in result) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
-
-  const { error } = await supabase
-    .from('quotes')
-    .update({ status: 'final' })
-    .eq('id', id)
-    .eq('status', 'draft');
-
-  if (error) {
-    return NextResponse.json({ error: 'Afwerken mislukt. Probeer opnieuw.' }, { status: 500 });
+  if (!result.ok) {
+    return NextResponse.json({ blockers: result.blockers }, { status: 422 });
   }
-
-  // PDF failure must not undo finalizing — the quote is already correct and
-  // the PDF can be regenerated on demand from the download route.
-  try {
-    const { data: contractor } = await supabase
-      .from('contractors').select('*').eq('id', quote.contractor_id).single();
-
-    const pdf = await renderQuotePdf({
-      contractor: contractor as Contractor,
-      quote: { ...(quote as Quote), status: 'final' },
-      lineItems: (lineItems ?? []) as QuoteLineItem[],
-    });
-
-    const path = `${quote.contractor_id}/${id}.pdf`;
-    const { error: uploadError } = await supabase.storage
-      .from('quote-pdfs')
-      .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
-    if (uploadError) throw new Error(uploadError.message);
-
-    const { error: pdfPathError } = await supabase
-      .from('quotes')
-      .update({ pdf_path: path })
-      .eq('id', id);
-    if (pdfPathError) throw new Error(pdfPathError.message);
-
-    await logPipelineEvent({
-      quoteId: id, contractorId: quote.contractor_id, step: 'pdf_generate',
-      status: 'success', detail: { path },
-    });
-  } catch (pdfError) {
-    await logPipelineEvent({
-      quoteId: id, contractorId: quote.contractor_id, step: 'pdf_generate',
-      status: 'error', detail: { error: String(pdfError) },
-    });
-  }
-
   return NextResponse.json({ ok: true });
 }

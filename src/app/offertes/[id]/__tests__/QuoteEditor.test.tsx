@@ -23,7 +23,7 @@ const quote: Quote = {
   id: 'quote-1', contractor_id: 'c1', transcript: 'tachtig vierkante meter dakpannen',
   status: 'draft', customer_name: 'Jan Peeters', customer_address: 'Dorpsstraat 5',
   customer_email: null, customer_phone: null, audio_path: null, audio_deleted_at: null,
-  pdf_path: null, created_at: '2026-08-06T10:00:00Z',
+  pdf_path: null, pipeline_stage_id: null, created_at: '2026-08-06T10:00:00Z',
 };
 
 function line(overrides: Partial<QuoteLineItem> = {}): QuoteLineItem {
@@ -130,6 +130,19 @@ describe('QuoteEditor', () => {
 
     await waitFor(() =>
       expect(screen.getByText(/kon niet opgeslagen worden/i)).toBeInTheDocument(),
+    );
+  });
+
+  it('shows the new line item after adding it succeeds', async () => {
+    (addLineItem as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      line({ id: 'line-2', description: 'Nieuw item – materiaal', unit_price_cents: null, vat_rate: null }),
+    );
+
+    render(<QuoteEditor quote={quote} initialLineItems={[]} initialClarifications={[]} />);
+    await userEvent.click(screen.getByRole('button', { name: /materiaal toevoegen/i }));
+
+    await waitFor(() =>
+      expect(screen.getByDisplayValue('Nieuw item – materiaal')).toBeInTheDocument(),
     );
   });
 });

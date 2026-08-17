@@ -46,19 +46,22 @@ export default function VoiceRecorder({ onRecorded, label = 'Opnemen', disabled 
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col items-center gap-3">
       <button
         type="button"
         onClick={recording ? stop : start}
         disabled={disabled}
         aria-label={recording ? 'Stoppen' : label}
-        className={`rounded p-4 text-lg text-white disabled:opacity-50 ${
-          recording ? 'bg-red-600' : 'bg-black'
+        className={`btn h-20 w-20 rounded-full text-2xl shadow-sm ${
+          recording ? 'btn-danger animate-pulse' : 'btn-accent'
         }`}
       >
-        {recording ? '■ Stoppen' : `● ${label}`}
+        {recording ? '■' : '●'}
       </button>
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <span className="text-sm font-medium text-muted">
+        {recording ? 'Opname bezig — tik om te stoppen' : label}
+      </span>
+      {error && <p role="alert" className="alert alert-critical w-full">{error}</p>}
     </div>
   );
 }

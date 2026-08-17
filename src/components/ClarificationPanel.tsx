@@ -91,43 +91,47 @@ export default function ClarificationPanel({ quoteId, clarifications, onResolved
     }
   }
 
+  if (clarifications.length === 0) {
+    return null;
+  }
+
   if (pending.length === 0) {
     return (
-      <p className="rounded border border-green-300 bg-green-50 p-4 text-sm">
+      <p className="alert alert-success">
         Alle vragen beantwoord. Je kan de offerte afwerken.
       </p>
     );
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded border border-amber-300 bg-amber-50 p-4">
+    <section className="card flex flex-col gap-3 border-warning/40 bg-warning-bg/40">
       <h2 className="font-semibold">
-        Te verduidelijken (<span data-testid="pending-count">{pending.length}</span>)
+        Te verduidelijken (<span data-testid="pending-count" className="nums">{pending.length}</span>)
       </h2>
-      <p className="text-sm text-gray-700">
+      <p className="text-sm text-muted">
         Beantwoord deze vragen hardop, of vul ze hieronder handmatig aan.
       </p>
 
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="alert alert-critical">{error}</p>}
 
       <ul className="flex flex-col gap-4">
         {pending.map((item) => {
           const state = stateOf(item);
           return (
-            <li key={item.id} className="rounded border bg-white p-3">
-              <p className="mb-2 font-medium">{state.question}</p>
+            <li key={item.id} className="card bg-surface">
+              <p className="mb-3 font-medium">{state.question}</p>
 
               {state.capped && (
-                <p className="mb-2 text-sm text-amber-800">
+                <p className="mb-3 text-sm text-warning">
                   Ik begrijp het antwoord niet. Vul dit handmatig aan bij de offertelijnen.
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => void playQuestion(item.id)}
-                  className="rounded border px-3 py-2 text-sm"
+                  className="btn btn-outline"
                 >
                   ▶ Vraag afspelen
                 </button>
@@ -141,13 +145,13 @@ export default function ClarificationPanel({ quoteId, clarifications, onResolved
                 <button
                   type="button"
                   onClick={() => void dismiss(item.id)}
-                  className="text-sm underline"
+                  className="text-sm font-medium text-muted underline underline-offset-2 hover:text-ink"
                 >
                   Niet van toepassing
                 </button>
               </div>
 
-              {busyId === item.id && <p className="mt-2 text-sm text-gray-600">Bezig met verwerken…</p>}
+              {busyId === item.id && <p className="mt-3 text-sm text-muted">Bezig met verwerken…</p>}
             </li>
           );
         })}

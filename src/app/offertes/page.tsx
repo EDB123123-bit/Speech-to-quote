@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireContractor } from '@/lib/auth/require-contractor';
+import DeleteQuoteButton from '@/components/DeleteQuoteButton';
 import type { Quote } from '@/lib/supabase/types';
 
 export default async function QuotesPage() {
@@ -14,36 +15,38 @@ export default async function QuotesPage() {
 
   return (
     <main className="mx-auto max-w-2xl p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Offertes</h1>
-        <Link href="/offertes/nieuw" className="rounded bg-black px-4 py-2 text-white">
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="text-3xl font-semibold">Offertes</h1>
+        <Link href="/offertes/nieuw" className="btn btn-accent">
           Nieuwe offerte
         </Link>
       </div>
 
       {quotes.length === 0 ? (
-        <p className="rounded border border-dashed p-6 text-center text-sm text-gray-600">
+        <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted">
           Nog geen offertes. Maak je eerste offerte door de klus in te spreken.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-3">
           {quotes.map((quote) => (
             <li key={quote.id}>
-              <Link href={`/offertes/${quote.id}`} className="flex items-center justify-between rounded border p-4">
-                <div>
-                  <p className="font-medium">{quote.customer_name ?? 'Zonder klantnaam'}</p>
-                  <p className="text-sm text-gray-600">
-                    {new Date(quote.created_at).toLocaleDateString('nl-BE')}
-                  </p>
-                </div>
-                <span
-                  className={`rounded px-2 py-1 text-xs ${
-                    quote.status === 'final' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
-                  }`}
+              <div className="card flex items-center justify-between gap-3">
+                <Link
+                  href={`/offertes/${quote.id}`}
+                  className="flex min-w-0 flex-1 items-center justify-between transition-colors hover:text-accent"
                 >
-                  {quote.status === 'final' ? 'Afgewerkt' : 'Concept'}
-                </span>
-              </Link>
+                  <div>
+                    <p className="font-medium">{quote.customer_name ?? 'Zonder klantnaam'}</p>
+                    <p className="nums text-sm text-muted">
+                      {new Date(quote.created_at).toLocaleDateString('nl-BE')}
+                    </p>
+                  </div>
+                  <span className={`badge ${quote.status === 'final' ? 'badge-success' : 'badge-neutral'}`}>
+                    {quote.status === 'final' ? 'Afgewerkt' : 'Concept'}
+                  </span>
+                </Link>
+                <DeleteQuoteButton quoteId={quote.id} />
+              </div>
             </li>
           ))}
         </ul>

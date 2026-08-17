@@ -4,7 +4,8 @@ import type { Contractor, Quote, QuoteLineItem } from '@/lib/supabase/types';
 
 const contractor: Contractor = {
   id: 'c1', company_name: 'Dakwerken Janssens', address: 'Kerkstraat 1, 9000 Gent',
-  vat_number: 'BE0123456789', phone: '0470123456', created_at: '2026-01-01T00:00:00Z',
+  vat_number: 'BE0123456789', phone: '0470123456', onboarding_completed_at: null,
+  created_at: '2026-01-01T00:00:00Z',
 };
 
 const quote: Quote = {
@@ -12,7 +13,7 @@ const quote: Quote = {
   transcript: 'tachtig vierkante meter', status: 'final',
   customer_name: 'Jan Peeters', customer_address: 'Dorpsstraat 5, 9050 Gentbrugge',
   customer_email: null, customer_phone: null, audio_path: null, audio_deleted_at: null,
-  pdf_path: null, created_at: '2026-08-06T10:30:00Z',
+  pdf_path: null, pipeline_stage_id: null, created_at: '2026-08-06T10:30:00Z',
 };
 
 function line(overrides: Partial<QuoteLineItem> = {}): QuoteLineItem {

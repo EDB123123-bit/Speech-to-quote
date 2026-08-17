@@ -1,9 +1,10 @@
 import { requireContractor } from '@/lib/auth/require-contractor';
 import { getMailboxSummary } from '@/lib/mailbox/connection';
 import CatalogForm from '@/components/CatalogForm';
-import type { CatalogItem, MailboxSummary } from '@/lib/supabase/types';
+import type { CatalogItem, MailboxSummary, PipelineStage } from '@/lib/supabase/types';
 import ProfileForm from './ProfileForm';
 import { disconnectMailbox } from './actions';
+import PipelineStagesForm from './PipelineStagesForm';
 
 const MAILBOX_ERRORS: Record<string, string> = {
   access_denied: 'Je hebt de toegang tot je mailbox geweigerd.',
@@ -22,8 +23,9 @@ type Props = {
 
 export default async function SettingsPage({ searchParams }: Props) {
   const { supabase, contractor } = await requireContractor();
-  const [{ data }, mailbox, params] = await Promise.all([
+  const [{ data: catalogItems }, { data: stages }, mailbox, params] = await Promise.all([
     supabase.from('catalog_items').select('*').order('name', { ascending: true }),
+    supabase.from('pipeline_stages').select('*').order('sort_order', { ascending: true }),
     getMailboxSummary(contractor.id),
     searchParams,
   ]);
@@ -33,11 +35,11 @@ export default async function SettingsPage({ searchParams }: Props) {
 
   return (
     <main className="mx-auto max-w-2xl p-6">
-      <h1 className="mb-6 text-2xl font-bold">Instellingen</h1>
+      <h1 className="mb-8 text-3xl font-semibold">Instellingen</h1>
 
       <section className="mb-10">
-        <h2 className="mb-3 text-lg font-semibold">Bedrijfsgegevens</h2>
-        <p className="mb-4 text-sm text-gray-600">
+        <h2 className="mb-2 text-lg font-semibold">Bedrijfsgegevens</h2>
+        <p className="mb-4 text-sm text-muted">
           Deze gegevens verschijnen op elke offerte die je genereert.
         </p>
         <ProfileForm contractor={contractor} />
@@ -45,7 +47,7 @@ export default async function SettingsPage({ searchParams }: Props) {
 
       <section className="mb-10">
         <h2 className="mb-3 text-lg font-semibold">Mailbox</h2>
-        <p className="mb-4 text-sm text-gray-600">
+        <p className="mb-4 text-sm text-muted">
           Verstuur afgewerkte offertes vanuit je eigen Gmail- of Outlook-adres.
         </p>
 
@@ -64,11 +66,19 @@ export default async function SettingsPage({ searchParams }: Props) {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Prijslijst</h2>
-        <p className="mb-4 text-sm text-gray-600">
+        <h2 className="mb-2 text-lg font-semibold">Prijslijst</h2>
+        <p className="mb-4 text-sm text-muted">
           Je eigen prijzen. Deze worden gebruikt om je gesproken beschrijving om te zetten in een offerte.
         </p>
-        <CatalogForm items={(data ?? []) as CatalogItem[]} />
+        <CatalogForm items={(catalogItems ?? []) as CatalogItem[]} />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Pijplijnfasen</h2>
+        <p className="mb-4 text-sm text-muted">
+          De fasen die een offerte doorloopt nadat ze is afgewerkt, zoals je ze wil bijhouden in Pijplijn.
+        </p>
+        <PipelineStagesForm stages={(stages ?? []) as PipelineStage[]} />
       </section>
     </main>
   );

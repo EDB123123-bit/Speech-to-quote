@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireContractor } from '@/lib/auth/require-contractor';
 import { validateCatalogInput } from '@/lib/validation/catalog';
+import { normalizeUnitCode } from '@/lib/invoices/constants';
 
 export async function createCatalogItem(form: FormData): Promise<void> {
   const { supabase, contractor } = await requireContractor();
@@ -15,9 +16,10 @@ export async function createCatalogItem(form: FormData): Promise<void> {
     vat_rate: String(form.get('vat_rate') ?? ''),
   });
 
+  const unitCode = normalizeUnitCode(input.unit, String(form.get('unit_code') ?? ''));
   const { error } = await supabase
     .from('catalog_items')
-    .insert({ ...input, contractor_id: contractor.id });
+    .insert({ ...input, unit_code: unitCode, contractor_id: contractor.id });
 
   if (error) throw new Error('Opslaan mislukt. Probeer opnieuw.');
   revalidatePath('/instellingen');

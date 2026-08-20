@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import LineItemsEditor from '@/components/LineItemsEditor';
 import ClarificationPanel from '@/components/ClarificationPanel';
 import CustomerForm from '@/components/CustomerForm';
@@ -19,6 +20,7 @@ type Props = {
   initialClarifications: QuoteClarification[];
   mailbox?: MailboxSummary | null;
   companyName?: string;
+  invoice?: { id: string; status: string; invoice_number: string | null } | null;
 };
 
 export default function QuoteEditor({
@@ -27,6 +29,7 @@ export default function QuoteEditor({
   initialClarifications,
   mailbox = null,
   companyName = 'je bedrijf',
+  invoice = null,
 }: Props) {
   const router = useRouter();
   const [lineItems, setLineItems] = useState(initialLineItems);
@@ -206,6 +209,11 @@ export default function QuoteEditor({
               <a href={`/api/quotes/${quote.id}/pdf`} className="btn btn-outline w-full">
                 <Icon name="download" size={21} /> Pdf downloaden
               </a>
+              {invoice ? (
+                <Link href={`/facturen/${invoice.id}`} className="btn btn-accent w-full">{invoice.status === 'draft' ? 'Factuurconcept verder nakijken' : `Factuur ${invoice.invoice_number ?? ''} bekijken`}</Link>
+              ) : (
+                <Link href={`/facturen/nieuw?quote=${quote.id}`} className="btn btn-accent w-full">Factuur maken</Link>
+              )}
               </div>
             </section>
             <EmailQuoteForm quote={quote} companyName={companyName} mailbox={mailbox} />

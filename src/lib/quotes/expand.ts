@@ -12,6 +12,7 @@ export type NewLineItem = {
   description: string;
   quantity: number;
   unit: string;
+  unit_code?: string | null;
   unit_price_cents: number | null;
   vat_rate: VatRate | null;
   line_type: LineType;
@@ -43,6 +44,7 @@ export function expandTasksToLineItems(
         description: `${baseName} – ${SUFFIX[lineType]}`,
         quantity: task.quantity,
         unit,
+        unit_code: match?.unit_code ?? null,
         unit_price_cents: match
           ? lineType === 'materials'
             ? match.materials_price_cents

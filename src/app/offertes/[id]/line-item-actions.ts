@@ -23,6 +23,7 @@ export async function addLineItem(quoteId: string, lineType: LineType): Promise<
       description: lineType === 'materials' ? 'Nieuw item – materiaal' : 'Nieuw item – arbeid',
       quantity: 1,
       unit: 'stuk',
+      unit_code: null,
       unit_price_cents: null,
       vat_rate: null,
       line_type: lineType,

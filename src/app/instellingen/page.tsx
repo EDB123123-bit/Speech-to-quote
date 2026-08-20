@@ -52,8 +52,8 @@ export default async function SettingsPage({ searchParams }: Props) {
 
       <section id="bedrijf" className="settings-section">
         <h2 className="section-heading">Bedrijfsgegevens</h2>
-        <p className="section-copy">
-          Deze gegevens verschijnen op elke offerte die je genereert.
+          <p className="section-copy">
+          Deze gegevens verschijnen op elke offerte en factuur die je genereert.
         </p>
         <ProfileForm contractor={contractor} />
       </section>

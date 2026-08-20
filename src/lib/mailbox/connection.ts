@@ -1,7 +1,15 @@
-import { createAdminSupabase } from '@/lib/supabase/admin';
+import {
+  createAdminSupabase,
+  hasAdminSupabaseConfig,
+  SupabaseAdminConfigError,
+} from '@/lib/supabase/admin';
 import type { MailboxConnection, MailboxSummary } from '@/lib/supabase/types';
 
 export async function getMailboxSummary(userId: string): Promise<MailboxSummary | null> {
+  // Mailbox integration is optional. Pages that show a connection badge must
+  // remain usable when only the public Supabase configuration is present.
+  if (!hasAdminSupabaseConfig()) return null;
+
   const { data, error } = await createAdminSupabase()
     .from('mailbox_connections')
     .select('provider,email_address,status,connected_at')
@@ -13,6 +21,8 @@ export async function getMailboxSummary(userId: string): Promise<MailboxSummary 
 }
 
 export async function getMailboxConnection(userId: string): Promise<MailboxConnection | null> {
+  if (!hasAdminSupabaseConfig()) throw new SupabaseAdminConfigError();
+
   const { data, error } = await createAdminSupabase()
     .from('mailbox_connections')
     .select('*')
@@ -24,6 +34,8 @@ export async function getMailboxConnection(userId: string): Promise<MailboxConne
 }
 
 export async function disconnectMailboxConnection(userId: string): Promise<void> {
+  if (!hasAdminSupabaseConfig()) throw new SupabaseAdminConfigError();
+
   const { error } = await createAdminSupabase()
     .from('mailbox_connections')
     .delete()
@@ -33,6 +45,15 @@ export async function disconnectMailboxConnection(userId: string): Promise<void>
 }
 
 export async function markMailboxDisconnected(connectionId: string): Promise<void> {
+  // This is best-effort cleanup after a failed token refresh. Do not turn a
+  // missing optional server credential into a second application failure.
+  if (!hasAdminSupabaseConfig()) {
+    console.warn(
+      '[mailbox] cannot mark connection disconnected: Supabase service-role configuration is missing',
+    );
+    return;
+  }
+
   const { error } = await createAdminSupabase()
     .from('mailbox_connections')
     .update({ status: 'disconnected', updated_at: new Date().toISOString() })

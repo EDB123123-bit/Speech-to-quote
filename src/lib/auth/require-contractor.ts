@@ -20,7 +20,7 @@ export async function requireContractor() {
     .eq('id', data.user.id)
     .single();
 
-  if (!contractor) throw new UnauthorizedError();
+  if (!contractor || contractor.deactivated_at) throw new UnauthorizedError();
 
   return { supabase, contractor: contractor as Contractor };
 }

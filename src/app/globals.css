@@ -54,7 +54,9 @@ body {
 
 button, input, select, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
-a { color: inherit; }
+@layer base {
+  a { color: inherit; }
+}
 h1, h2, h3 { color: var(--ink); font-family: var(--font-figtree), system-ui, sans-serif; font-weight: 800; letter-spacing: -0.025em; text-wrap: balance; }
 ::selection { background: var(--accent); color: var(--ink); }
 :focus-visible { outline: 3px solid #4059c7; outline-offset: 3px; }
@@ -70,7 +72,7 @@ h1, h2, h3 { color: var(--ink); font-family: var(--font-figtree), system-ui, san
   bottom: 0;
   left: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.4rem;
   padding: 0.55rem 0.75rem max(0.8rem, env(safe-area-inset-bottom));
   border-top: 1px solid rgba(20, 18, 15, 0.1);

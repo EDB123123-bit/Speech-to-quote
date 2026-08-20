@@ -49,8 +49,8 @@ export default function CatalogForm({ items }: { items: CatalogItem[] }) {
           <li key={item.id} className="catalog-row">
             <div>
               <p className="catalog-name">{item.name}</p>
-              <p className="catalog-meta nums">
-                materiaal {formatEuros(item.materials_price_cents)} · arbeid {formatEuros(item.labor_price_cents)} · {item.vat_rate === 0.06 ? '6%' : '21%'} btw
+            <p className="catalog-meta nums">
+                materiaal {formatEuros(item.materials_price_cents)} · arbeid {formatEuros(item.labor_price_cents)} · {item.vat_rate === 0.06 ? '6%' : '21%'} btw · code {item.unit_code ?? 'automatisch'}
               </p>
             </div>
             <div>
@@ -68,6 +68,14 @@ export default function CatalogForm({ items }: { items: CatalogItem[] }) {
         <h3 className="sr-only">Nieuw item toevoegen</h3>
         <div className="sm:col-span-2"><input name="name" required placeholder="Omschrijving (bv. Dakpannen leggen)" className="field" /></div>
         <input name="unit" required placeholder="Eenheid (bv. m², stuk, uur)" className="field" />
+        <select name="unit_code" defaultValue="" className="field">
+          <option value="">Eenheidscode automatisch bepalen</option>
+          <option value="MTK">MTK · m²</option>
+          <option value="HUR">HUR · uur</option>
+          <option value="C62">C62 · stuk</option>
+          <option value="MTR">MTR · meter</option>
+          <option value="KGM">KGM · kilogram</option>
+        </select>
         <input name="materials_price" required inputMode="decimal" placeholder="Materiaalprijs per eenheid (€)" className="field nums" />
         <input name="labor_price" required inputMode="decimal" placeholder="Arbeidsprijs per eenheid (€)" className="field nums" />
         <select name="vat_rate" required defaultValue="" className="field sm:col-span-2">

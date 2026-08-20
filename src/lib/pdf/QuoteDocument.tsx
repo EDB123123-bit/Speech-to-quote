@@ -93,8 +93,8 @@ export default function QuoteDocument({ model }: { model: QuoteViewModel }) {
 
         {model.showsReducedVatNotice && (
           <Text style={styles.notice}>
-            Het verlaagde btw-tarief van 6% is van toepassing op renovatiewerken aan woningen ouder
-            dan 10 jaar, mits de klant het vereiste attest ondertekent.
+            Het verlaagde btw-tarief van 6% is alleen van toepassing wanneer de wettelijke voorwaarden
+            voor renovatiewerken aan de woning vervuld zijn. De vereiste verklaring wordt op de factuur opgenomen.
           </Text>
         )}
       </Page>

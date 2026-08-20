@@ -11,10 +11,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const { supabase, contractor } = await requireContractor();
 
-  const [{ data: quote }, { data: lineItems }, { data: clarifications }, mailbox] = await Promise.all([
+  const [{ data: quote }, { data: lineItems }, { data: clarifications }, { data: invoice }, mailbox] = await Promise.all([
     supabase.from('quotes').select('*').eq('id', id).single(),
     supabase.from('quote_line_items').select('*').eq('quote_id', id).order('sort_order'),
     supabase.from('quote_clarifications').select('*').eq('quote_id', id).order('created_at'),
+    supabase.from('invoices').select('id, status, invoice_number').eq('quote_id', id).eq('document_type', 'invoice').maybeSingle(),
     getMailboxSummary(contractor.id),
   ]);
 
@@ -44,6 +45,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         initialClarifications={(clarifications ?? []) as QuoteClarification[]}
         mailbox={mailbox}
         companyName={contractor.company_name}
+        invoice={invoice as { id: string; status: string; invoice_number: string | null } | null}
       />
       <div className="mt-7 flex justify-end">
         <DeleteQuoteButton quoteId={typedQuote.id} redirectTo="/offertes" />

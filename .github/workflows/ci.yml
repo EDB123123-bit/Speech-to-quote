@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Validate Supabase migrations and database security tests
+        run: |
+          npx --yes supabase@2.114.0 start
+          npx --yes supabase@2.114.0 db reset
+          npx --yes supabase@2.114.0 test db
+      - run: npm run validate:peppol
+      - run: npm run build
+      - if: always()
+        run: npx --yes supabase@2.114.0 stop --no-backup

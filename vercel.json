@@ -1,7 +1,6 @@
 {
   "regions": ["dub1"],
   "crons": [
-    { "path": "/api/cron/cleanup-audio", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/process-peppol", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/cleanup-audio", "schedule": "0 3 * * *" }
   ]
 }

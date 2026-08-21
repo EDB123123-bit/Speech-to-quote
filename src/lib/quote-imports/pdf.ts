@@ -28,7 +28,11 @@ export async function inspectPdf(pdf: Uint8Array): Promise<{ pageCount: number }
   }
 
   try {
-    const task = pdfjs.getDocument({ data: pdf });
+    // PDF.js transfers the supplied typed array to its worker and detaches the
+    // underlying ArrayBuffer. Keep ownership of the verified source bytes: the
+    // same bytes are encoded for the extractor immediately after inspection.
+    const parserPdf = new Uint8Array(pdf);
+    const task = pdfjs.getDocument({ data: parserPdf });
     const document = await task.promise;
     const pageCount = document.numPages;
     await task.destroy();

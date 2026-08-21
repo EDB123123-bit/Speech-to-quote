@@ -32,6 +32,7 @@ export function buildQuoteExtractionParams(input: {
   filename: string;
   model: string;
 }): Anthropic.MessageCreateParamsNonStreaming {
+  if (input.pdf.byteLength === 0) throw new Error('quote_extraction_empty_pdf');
   return {
     model: input.model,
     max_tokens: 8000,

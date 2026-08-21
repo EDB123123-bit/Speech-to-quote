@@ -8,6 +8,7 @@ vi.mock('@/lib/ai/anthropic-client', () => ({
 }));
 
 const {
+  buildQuoteExtractionParams,
   extractQuoteWithModelCascade,
   parseQuoteExtractionMessage,
 } = await import('../anthropic-extractor');
@@ -60,6 +61,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('Anthropic quote extraction routing', () => {
+  it('rejects an empty PDF before calling the provider', () => {
+    expect(() => buildQuoteExtractionParams({
+      pdf: new Uint8Array(),
+      filename: 'quote.pdf',
+      model: 'claude-haiku-test',
+    })).toThrow('quote_extraction_empty_pdf');
+    expect(parse).not.toHaveBeenCalled();
+  });
+
   it('keeps a clean extraction on Haiku', async () => {
     parse.mockResolvedValueOnce(response(fixture()));
     const result = await extractQuoteWithModelCascade({ pdf: new Uint8Array([1]), filename: 'quote.pdf' });

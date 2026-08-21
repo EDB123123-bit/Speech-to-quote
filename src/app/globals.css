@@ -72,15 +72,15 @@ h1, h2, h3 { color: var(--ink); font-family: var(--font-figtree), system-ui, san
   bottom: 0;
   left: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.4rem;
-  padding: 0.55rem 0.75rem max(0.8rem, env(safe-area-inset-bottom));
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.3rem;
+  padding: 0.55rem 0.5rem max(0.8rem, env(safe-area-inset-bottom));
   border-top: 1px solid rgba(20, 18, 15, 0.1);
   background: rgba(255, 246, 241, 0.95);
   box-shadow: 0 -10px 30px rgba(20, 18, 15, 0.06);
   backdrop-filter: blur(16px);
 }
-.mobile-tab { display: flex; min-height: 58px; align-items: center; justify-content: center; flex-direction: column; gap: 0.2rem; border-radius: 16px; color: var(--muted); font-size: 0.78rem; font-weight: 650; text-decoration: none; }
+.mobile-tab { display: flex; min-height: 58px; align-items: center; justify-content: center; flex-direction: column; gap: 0.2rem; border-radius: 16px; color: var(--muted); font-size: 0.7rem; font-weight: 650; text-align: center; line-height: 1.15; text-decoration: none; }
 .mobile-tab.is-active { background: var(--paper-strong); color: var(--ink); font-weight: 800; }
 
 .page-shell { width: 100%; max-width: 1160px; margin: 0 auto; padding: 2rem clamp(1.1rem, 4vw, 2.5rem) 7.5rem; }

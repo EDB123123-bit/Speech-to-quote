@@ -18,7 +18,7 @@ export type QuoteListItem = {
   openQuestions: number;
 };
 
-export default function QuotesList({ quotes }: { quotes: QuoteListItem[] }) {
+export default function QuotesList({ quotes, showSearch = true }: { quotes: QuoteListItem[]; showSearch?: boolean }) {
   const [query, setQuery] = useState('');
   const needle = query.trim().toLocaleLowerCase('nl-BE');
   const filtered = needle
@@ -29,7 +29,7 @@ export default function QuotesList({ quotes }: { quotes: QuoteListItem[] }) {
 
   return (
     <>
-      <label className="search-field mb-5">
+      {showSearch && <label className="search-field mb-5">
         <span className="sr-only">Zoek op klant of plaats</span>
         <Icon name="search" size={20} />
         <input
@@ -38,7 +38,7 @@ export default function QuotesList({ quotes }: { quotes: QuoteListItem[] }) {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Zoek op klant of plaats"
         />
-      </label>
+      </label>}
 
       {filtered.length === 0 ? (
         <div className="empty-state">

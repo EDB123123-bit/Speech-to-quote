@@ -155,6 +155,14 @@ export async function processInteractiveQuoteImport(
     return await recordExtraction(document, contractorId, pageCount, extraction);
   } catch (error) {
     const unsupported = error instanceof UnsupportedPdfError;
+    console.error(JSON.stringify({
+      level: 'error',
+      message: 'quote_import_processing_failed',
+      documentId,
+      errorCode: unsupported ? error.code : 'extraction_failed',
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    }));
     return recordQuoteImportFailure({
       documentId,
       contractorId,

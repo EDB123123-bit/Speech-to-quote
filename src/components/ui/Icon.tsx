@@ -14,6 +14,7 @@ export type IconName =
   | 'search'
   | 'settings'
   | 'share'
+  | 'users'
   | 'warning';
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
@@ -54,6 +55,7 @@ export default function Icon({ name, size = 24, ...props }: Props) {
     search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></>,
     settings: <><circle cx="12" cy="12" r="3.2" /><path d="M12 3.5v2.6M12 17.9v2.6M4.5 12h2.6M16.9 12h2.6M6.7 6.7l1.9 1.9M15.4 15.4l1.9 1.9M17.3 6.7l-1.9 1.9M8.6 15.4l-1.9 1.9" /></>,
     share: <><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></>,
+    users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 5.2a3.5 3.5 0 0 1 0 5.6M17.5 14.4a6.5 6.5 0 0 1 4 5.6" /></>,
     warning: <><circle cx="12" cy="12" r="9.5" /><path d="M12 7.5V13" /><circle cx="12" cy="16.7" r="1" fill="currentColor" stroke="none" /></>,
   };
 

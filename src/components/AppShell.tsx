@@ -8,6 +8,7 @@ import Icon, { type IconName } from '@/components/ui/Icon';
 const NAV_ITEMS: { href: string; label: string; icon: IconName; matches: (path: string) => boolean }[] = [
   { href: '/offertes', label: 'Offertes', icon: 'grid', matches: (path) => path.startsWith('/offertes') },
   { href: '/facturen', label: 'Facturen', icon: 'file', matches: (path) => path.startsWith('/facturen') },
+  { href: '/klanten', label: 'Klanten', icon: 'users', matches: (path) => path.startsWith('/klanten') },
   { href: '/pijplijn', label: 'Pijplijn', icon: 'prices', matches: (path) => path.startsWith('/pijplijn') },
   { href: '/instellingen', label: 'Instellingen', icon: 'settings', matches: (path) => path.startsWith('/instellingen') },
 ];

@@ -14,8 +14,20 @@ export async function inspectPdf(pdf: Uint8Array): Promise<{ pageCount: number }
   if (pdf.byteLength > QUOTE_IMPORT_LIMITS.maxFileBytes) {
     throw new UnsupportedPdfError('file_limit', 'De pdf is groter dan 20 MB.');
   }
+  let pdfjs: typeof import('pdfjs-dist/legacy/build/pdf.mjs');
   try {
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  } catch (error) {
+    console.error(JSON.stringify({
+      level: 'error',
+      message: 'quote_import_pdf_runtime_load_failed',
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    }));
+    throw error;
+  }
+
+  try {
     const task = pdfjs.getDocument({ data: pdf });
     const document = await task.promise;
     const pageCount = document.numPages;

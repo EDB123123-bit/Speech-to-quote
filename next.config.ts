@@ -9,10 +9,12 @@ const nextConfig: NextConfig = {
     '/api/quote-imports/*/process': [
       './node_modules/@napi-rs/canvas/**/*',
       './node_modules/@napi-rs/canvas-*/**/*',
+      './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
     ],
     '/api/quote-imports/batches/*/process': [
       './node_modules/@napi-rs/canvas/**/*',
       './node_modules/@napi-rs/canvas-*/**/*',
+      './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
     ],
   },
 };

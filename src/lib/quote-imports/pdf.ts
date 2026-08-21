@@ -39,7 +39,16 @@ export async function inspectPdf(pdf: Uint8Array): Promise<{ pageCount: number }
   } catch (error) {
     if (error instanceof UnsupportedPdfError) throw error;
     const name = error instanceof Error ? error.name : '';
+    console.error(JSON.stringify({
+      level: 'error',
+      message: 'quote_import_pdf_parse_failed',
+      errorName: name || 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    }));
     if (name === 'PasswordException') throw new UnsupportedPdfError('password_protected', 'Pdf’s met een wachtwoord worden niet ondersteund.');
-    throw new UnsupportedPdfError('invalid_pdf', 'De pdf kon niet veilig gelezen worden.');
+    if (['InvalidPDFException', 'MissingPDFException', 'UnexpectedResponseException', 'FormatError'].includes(name)) {
+      throw new UnsupportedPdfError('invalid_pdf', 'De pdf kon niet veilig gelezen worden.');
+    }
+    throw error;
   }
 }

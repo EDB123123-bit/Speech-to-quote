@@ -5,7 +5,7 @@ import { requireContractor } from '@/lib/auth/require-contractor';
 import type { LineType, QuoteLineItem } from '@/lib/supabase/types';
 
 type LineItemPatch = Partial<
-  Pick<QuoteLineItem, 'description' | 'quantity' | 'unit' | 'unit_price_cents' | 'vat_rate'>
+  Pick<QuoteLineItem, 'description' | 'source_notes' | 'quantity' | 'unit' | 'unit_price_cents' | 'vat_rate' | 'vat_category'>
 >;
 
 export async function updateLineItem(id: string, patch: LineItemPatch): Promise<void> {
@@ -20,7 +20,7 @@ export async function addLineItem(quoteId: string, lineType: LineType): Promise<
     .from('quote_line_items')
     .insert({
       quote_id: quoteId,
-      description: lineType === 'materials' ? 'Nieuw item – materiaal' : 'Nieuw item – arbeid',
+      description: lineType === 'materials' ? 'Nieuw item – materiaal' : lineType === 'labor' ? 'Nieuw item – arbeid' : 'Nieuwe gecombineerde lijn',
       quantity: 1,
       unit: 'stuk',
       unit_code: null,

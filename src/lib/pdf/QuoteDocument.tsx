@@ -38,6 +38,8 @@ export default function QuoteDocument({ model }: { model: QuoteViewModel }) {
           <View>
             <Text style={styles.sectionTitle}>Offerte {model.quoteNumber}</Text>
             <Text style={styles.muted}>Datum: {model.dateNl}</Text>
+            {!!model.validUntilNl && <Text style={styles.muted}>Geldig tot: {model.validUntilNl}</Text>}
+            {!!model.orderReference && <Text style={styles.muted}>Referentie: {model.orderReference}</Text>}
           </View>
         </View>
 
@@ -76,11 +78,11 @@ export default function QuoteDocument({ model }: { model: QuoteViewModel }) {
           {model.totals.vatGroups.map((group) => (
             <View key={group.vatRate}>
               <View style={styles.totalRow}>
-                <Text>Subtotaal ({group.vatRate === 0.06 ? '6%' : '21%'})</Text>
+                <Text>Subtotaal ({group.vatRate === 0 ? 'verlegging' : group.vatRate === 0.06 ? '6%' : '21%'})</Text>
                 <Text>{formatEuros(group.subtotalCents)}</Text>
               </View>
               <View style={styles.totalRow}>
-                <Text>Btw {group.vatRate === 0.06 ? '6%' : '21%'}</Text>
+                <Text>{group.vatRate === 0 ? 'Btw verlegd' : `Btw ${group.vatRate === 0.06 ? '6%' : '21%'}`}</Text>
                 <Text>{formatEuros(group.vatAmountCents)}</Text>
               </View>
             </View>
@@ -96,6 +98,9 @@ export default function QuoteDocument({ model }: { model: QuoteViewModel }) {
             Het verlaagde btw-tarief van 6% is alleen van toepassing wanneer de wettelijke voorwaarden
             voor renovatiewerken aan de woning vervuld zijn. De vereiste verklaring wordt op de factuur opgenomen.
           </Text>
+        )}
+        {model.totals.vatGroups.some((group) => group.vatRate === 0) && (
+          <Text style={styles.notice}>Verlegging van heffing</Text>
         )}
       </Page>
     </Document>

@@ -1,0 +1,30 @@
+begin;
+select plan(24);
+
+select has_table('public', 'quote_import_batches', 'batch table exists');
+select has_table('public', 'quote_import_documents', 'document table exists');
+select has_table('public', 'quote_import_events', 'append-only event table exists');
+select has_table('public', 'catalog_price_suggestions', 'catalog suggestions exist');
+select has_column('public', 'quote_import_batches', 'requested_quote_count', 'batch stores the user-requested count');
+select has_column('public', 'quote_import_batches', 'processing_mode', 'batch stores its server-selected processing mode');
+select ok((select relrowsecurity from pg_class where oid = 'public.quote_import_documents'::regclass), 'document RLS is enabled');
+select ok(not has_table_privilege('anon', 'public.quote_import_documents', 'SELECT'), 'anon cannot read import documents');
+select ok(not has_table_privilege('authenticated', 'public.quote_import_documents', 'UPDATE'), 'users cannot mutate documents directly');
+select ok(not has_table_privilege('authenticated', 'public.quote_import_events', 'INSERT'), 'users cannot forge events');
+select ok(has_function_privilege('authenticated', 'public.create_quote_import_batch(integer)', 'EXECUTE'), 'users can create batches through RPC');
+select ok(has_function_privilege('authenticated', 'public.approve_quote_import_document(uuid)', 'EXECUTE'), 'users can approve through RPC');
+select ok(not has_function_privilege('authenticated', 'public.claim_quote_import_document(uuid,uuid)', 'EXECUTE'), 'users cannot claim extractor work');
+select ok(has_function_privilege('service_role', 'public.claim_quote_import_document(uuid,uuid)', 'EXECUTE'), 'service role can claim extractor work');
+select ok(not has_function_privilege('authenticated', 'public.claim_quote_import_provider_document(uuid,uuid)', 'EXECUTE'), 'users cannot claim provider batch work');
+select ok(has_function_privilege('service_role', 'public.claim_quote_import_provider_document(uuid,uuid)', 'EXECUTE'), 'service role can claim provider batch work');
+select ok(not has_function_privilege('authenticated', 'public.record_quote_import_provider_batch(uuid,uuid,text,text,timestamp with time zone,integer,text,text)', 'EXECUTE'), 'users cannot forge provider batch identifiers');
+select ok(has_function_privilege('service_role', 'public.record_quote_import_provider_batch(uuid,uuid,text,text,timestamp with time zone,integer,text,text)', 'EXECUTE'), 'service role records provider batch identifiers');
+select ok(not has_function_privilege('authenticated', 'public.record_quote_import_provider_batch_status(uuid,uuid,text,timestamp with time zone,text)', 'EXECUTE'), 'users cannot forge provider batch statuses');
+select ok(has_function_privilege('service_role', 'public.record_quote_import_provider_batch_status(uuid,uuid,text,timestamp with time zone,text)', 'EXECUTE'), 'service role records provider batch statuses');
+select ok(not has_function_privilege('authenticated', 'private.approve_quote_import_document(uuid)', 'EXECUTE'), 'private approval implementation is hidden');
+select col_is_null('public', 'catalog_items', 'materials_price_cents', 'combined catalogue items permit null material price');
+select col_is_null('public', 'catalog_items', 'labor_price_cents', 'combined catalogue items permit null labour price');
+select ok(exists(select 1 from storage.buckets where id = 'quote-imports' and not public), 'source bucket is private');
+
+select * from finish();
+rollback;

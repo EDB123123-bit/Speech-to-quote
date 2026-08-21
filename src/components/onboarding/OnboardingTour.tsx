@@ -29,6 +29,15 @@ const STEPS: Step[] = [
     body: 'Klik op Instellingen om je bedrijfsgegevens en prijslijst in te stellen.',
   },
   {
+    id: 'pdf-import',
+    route: '/offertes',
+    selector: '[data-tour="quote-pdf-import"]',
+    title: 'Optioneel · Bestaande offertes',
+    body: 'Heb je al PDF-offertes? Importeer ze in één batch, of sla deze stap gewoon over.',
+    fallbackHref: '/offertes',
+    fallbackLabel: 'Ga naar Offertes',
+  },
+  {
     id: 'catalog',
     route: '/instellingen',
     selector: '[data-tour="catalog-form"]',

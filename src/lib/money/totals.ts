@@ -1,9 +1,9 @@
-import { VAT_RATES, type QuoteLineItem, type VatRate } from '@/lib/supabase/types';
+import { INVOICE_VAT_RATES, type QuoteLineItem, type QuoteVatRate } from '@/lib/supabase/types';
 
 export type TotalsLineItem = {
   quantity: number;
   unitPriceCents: number;
-  vatRate: VatRate;
+  vatRate: QuoteVatRate;
 };
 
 export function toTotalsInput(items: QuoteLineItem[]): TotalsLineItem[] {
@@ -12,12 +12,12 @@ export function toTotalsInput(items: QuoteLineItem[]): TotalsLineItem[] {
     .map((item) => ({
       quantity: item.quantity,
       unitPriceCents: item.unit_price_cents as number,
-      vatRate: item.vat_rate as VatRate,
+      vatRate: item.vat_rate as QuoteVatRate,
     }));
 }
 
 export type VatGroup = {
-  vatRate: VatRate;
+  vatRate: QuoteVatRate;
   subtotalCents: number;
   vatAmountCents: number;
 };
@@ -34,7 +34,7 @@ export function lineSubtotalCents(item: TotalsLineItem): number {
 }
 
 export function calculateTotals(items: TotalsLineItem[]): QuoteTotals {
-  const subtotalByRate = new Map<VatRate, number>();
+  const subtotalByRate = new Map<QuoteVatRate, number>();
 
   for (const item of items) {
     const current = subtotalByRate.get(item.vatRate) ?? 0;
@@ -43,7 +43,7 @@ export function calculateTotals(items: TotalsLineItem[]): QuoteTotals {
 
   // VAT is rounded once per rate group, not per line — matches how the
   // amount appears on a Belgian invoice.
-  const vatGroups: VatGroup[] = VAT_RATES.filter((rate) => subtotalByRate.has(rate)).map(
+  const vatGroups: VatGroup[] = INVOICE_VAT_RATES.filter((rate) => subtotalByRate.has(rate)).map(
     (rate) => {
       const subtotalCents = subtotalByRate.get(rate) ?? 0;
       return {

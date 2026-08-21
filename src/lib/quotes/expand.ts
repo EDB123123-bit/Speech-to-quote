@@ -22,6 +22,7 @@ export type NewLineItem = {
 const SUFFIX: Record<LineType, string> = {
   materials: 'materiaal',
   labor: 'arbeid',
+  combined: '',
 };
 
 export function expandTasksToLineItems(
@@ -38,6 +39,21 @@ export function expandTasksToLineItems(
     const baseName = match ? match.name : task.description;
     const unit = match ? match.unit : task.unit;
 
+    if (match?.pricing_mode === 'combined') {
+      rows.push({
+        catalog_item_id: match.id,
+        description: baseName,
+        quantity: task.quantity,
+        unit,
+        unit_code: match.unit_code ?? null,
+        unit_price_cents: match.combined_price_cents ?? null,
+        vat_rate: match.vat_rate,
+        line_type: 'combined',
+        sort_order: rows.length,
+      });
+      continue;
+    }
+
     for (const lineType of ['materials', 'labor'] as const) {
       rows.push({
         catalog_item_id: match ? match.id : null,
@@ -47,8 +63,8 @@ export function expandTasksToLineItems(
         unit_code: match?.unit_code ?? null,
         unit_price_cents: match
           ? lineType === 'materials'
-            ? match.materials_price_cents
-            : match.labor_price_cents
+            ? match.materials_price_cents ?? null
+            : match.labor_price_cents ?? null
           : null,
         vat_rate: match ? match.vat_rate : null,
         line_type: lineType,

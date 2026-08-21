@@ -11,6 +11,7 @@ import { checkFinalizeGate } from '@/lib/quotes/finalize-gate';
 import { calculateTotals, formatEuros, toTotalsInput } from '@/lib/money/totals';
 import Icon from '@/components/ui/Icon';
 import ShareQuoteButton from '@/components/ShareQuoteButton';
+import QuoteMetadataForm from '@/components/QuoteMetadataForm';
 import { updateLineItem, addLineItem } from '@/app/offertes/[id]/line-item-actions';
 import type { LineType, MailboxSummary, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
@@ -56,18 +57,22 @@ export default function QuoteEditor({
       if (!before) continue;
       const changed =
         before.description !== item.description ||
+        before.source_notes !== item.source_notes ||
         before.quantity !== item.quantity ||
         before.unit !== item.unit ||
         before.unit_price_cents !== item.unit_price_cents ||
-        before.vat_rate !== item.vat_rate;
+        before.vat_rate !== item.vat_rate ||
+        before.vat_category !== item.vat_category;
 
       if (changed) {
         void updateLineItem(item.id, {
           description: item.description,
+          source_notes: item.source_notes,
           quantity: item.quantity,
           unit: item.unit,
           unit_price_cents: item.unit_price_cents,
           vat_rate: item.vat_rate,
+          vat_category: item.vat_category,
         })
           .then(() => setSaveFailed(false))
           .catch(() => setSaveFailed(true));
@@ -165,12 +170,15 @@ export default function QuoteEditor({
           <LineItemsEditor items={lineItems} onChange={onLineItemsChange} readOnly={isFinal} />
 
           {!isFinal && (
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               <button type="button" onClick={() => void addLine('materials')} disabled={addingLineType !== null} className="btn btn-quiet">
                 <Icon name="plus" size={19} /> {addingLineType === 'materials' ? 'Bezig…' : 'Materiaal toevoegen'}
               </button>
               <button type="button" onClick={() => void addLine('labor')} disabled={addingLineType !== null} className="btn btn-quiet">
                 <Icon name="plus" size={19} /> {addingLineType === 'labor' ? 'Bezig…' : 'Arbeid toevoegen'}
+              </button>
+              <button type="button" onClick={() => void addLine('combined')} disabled={addingLineType !== null} className="btn btn-quiet">
+                <Icon name="plus" size={19} /> {addingLineType === 'combined' ? 'Bezig…' : 'Gecombineerd toevoegen'}
               </button>
             </div>
           )}
@@ -185,7 +193,7 @@ export default function QuoteEditor({
             <p>{quote.customer_name ?? 'Klant'} · {formatEuros(totals.grandTotalCents)} incl. btw</p>
           </div>
         ) : (
-          <CustomerForm quote={quote} />
+          <><QuoteMetadataForm quote={quote} /><CustomerForm quote={quote} /></>
         )}
 
         {saveFailed && (

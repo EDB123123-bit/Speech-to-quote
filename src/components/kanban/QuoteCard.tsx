@@ -32,7 +32,7 @@ export default function QuoteCard({ quote, column, stages, onMove, busy }: Props
         <Link href={`/offertes/${quote.id}`} className="flex-1 hover:text-accent">
           <p className="text-lg font-extrabold">{quote.customer_name ?? 'Zonder klantnaam'}</p>
           <p className="nums text-sm text-muted">
-            {new Date(quote.created_at).toLocaleDateString('nl-BE')}
+            {quote.quote_number ?? quote.id.split('-')[0].toUpperCase()} · {new Date(`${quote.issue_date ?? quote.created_at.slice(0, 10)}T00:00:00`).toLocaleDateString('nl-BE')}
           </p>
         </Link>
 

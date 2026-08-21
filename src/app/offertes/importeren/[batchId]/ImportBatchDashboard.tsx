@@ -11,6 +11,7 @@ import {
   inferredFieldLabelsByLine,
   type QuoteImportIssue,
 } from '@/lib/quote-imports/issues';
+import { formatLineNumbersNl } from '@/lib/quote-imports/approval-errors';
 import { formatEuros } from '@/lib/money/totals';
 import { approveQuoteImport, reviewProfileSuggestion } from '../actions';
 
@@ -108,6 +109,11 @@ function DocumentCard({ batch, document }: { batch: QuoteImportBatch; document: 
   const reviewedTotals = payload ? validateReviewedTotals(payload) : null;
   const grouped = groupQuoteImportIssues(issues, payload?.lines.length ?? 0);
   const inferredByLine = inferredFieldLabelsByLine(payload?.inferredPaths ?? [], payload?.lines.length ?? 0);
+  // The approval schema requires a unit on every line, so an empty one can never
+  // import. Block it here instead of letting the server reject the whole payload.
+  const linesMissingUnit = (payload?.lines ?? [])
+    .map((line, index) => (line.unit.trim() ? null : index + 1))
+    .filter((lineNumber): lineNumber is number => lineNumber !== null);
 
   if (document.status !== 'ready_for_review' || !payload) {
     return <article className="card flex items-center justify-between gap-4"><div><strong>{document.original_filename}</strong><p className="text-sm text-muted">{statusLabel(document.status, batch.processing_mode === 'provider_batch')}</p>{document.provider_batch_status === 'in_progress' && <p className="mt-1 text-xs text-muted">Asynchrone verwerking gestart; uiterlijk na 24 uur volgt een resultaat.</p>}{document.error_message && <p className="mt-1 text-sm text-red-700">{document.error_message}</p>}</div>{document.status === 'failed' && <button className="btn btn-outline" onClick={() => void fetch(`/api/quote-imports/${document.id}/process`, { method: 'POST' }).then(() => router.refresh())}>Opnieuw</button>}{document.quote_id && <Link className="btn btn-outline" href={`/offertes/${document.quote_id}`}>Open concept</Link>}</article>;
@@ -117,10 +123,14 @@ function DocumentCard({ batch, document }: { batch: QuoteImportBatch; document: 
     setMessage('');
     startTransition(async () => {
       try {
-        const quote = await approveQuoteImport({ documentId: document.id, batchId: batch.id, payload, identityMode, warningsAcknowledged: acknowledged, roundingOverrideReason: roundingReason || null });
-        router.push(`/offertes/${quote.id}`);
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Importeren mislukt.');
+        const result = await approveQuoteImport({ documentId: document.id, batchId: batch.id, payload, identityMode, warningsAcknowledged: acknowledged, roundingOverrideReason: roundingReason || null });
+        if (!result.ok) {
+          setMessage(result.error);
+          return;
+        }
+        router.push(`/offertes/${result.quote.id}`);
+      } catch {
+        setMessage('Importeren mislukt. Probeer opnieuw.');
       }
     });
   }
@@ -169,6 +179,7 @@ function DocumentCard({ batch, document }: { batch: QuoteImportBatch; document: 
             </li>)}
           </ul>}
           {inferredLabels.length > 0 && <p className="mb-3 text-xs text-muted">Afgeleide velden: {inferredLabels.join(', ')}</p>}
+          {!line.unit.trim() && <p className="mb-3 text-sm font-bold text-critical">Eenheid is verplicht. Vul in wat je factureert, bijvoorbeeld stuk, m² of uur.</p>}
           <div className="grid grid-cols-6 gap-2">
           <div className="col-span-5"><TextField label="Omschrijving" value={line.description} onChange={(value) => setPayload({ ...payload, lines: payload.lines.map((item, i) => i === index ? { ...item, description: value } : item) })} /></div><button type="button" className="text-sm font-bold text-critical" disabled={payload.lines.length === 1} onClick={() => setPayload({ ...payload, lines: payload.lines.filter((_, i) => i !== index) })}>Verwijder</button>
           <div className="col-span-6"><TextField label="Bronnotitie" value={line.notes ?? ''} onChange={(value) => setPayload({ ...payload, lines: payload.lines.map((item, i) => i === index ? { ...item, notes: value || null } : item) })} /></div>
@@ -183,8 +194,11 @@ function DocumentCard({ batch, document }: { batch: QuoteImportBatch; document: 
         <div className="rounded-xl bg-paper p-3 text-sm"><div className="flex justify-between"><span>Herberekend excl. btw</span><strong>{formatEuros(reviewedTotals!.totals.subtotalCents)}</strong></div><div className="flex justify-between"><span>Herberekende btw</span><strong>{formatEuros(reviewedTotals!.totals.vatTotalCents)}</strong></div><div className="flex justify-between"><span>Herberekend totaal</span><strong>{formatEuros(reviewedTotals!.totals.grandTotalCents)}</strong></div></div>
         {(issues.length > 0 || payload.inferredPaths.length > 0 || reviewedTotals!.mismatches.length > 0) && <label className="flex gap-2 text-sm"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /> Ik heb de waarschuwingen, afgeleide velden en eventuele totaalverschillen gecontroleerd.</label>}
         {reviewedTotals!.mismatches.length > 0 && <TextField label="Reden voor verschil met de brontotalen" value={roundingReason} onChange={setRoundingReason} />}
+        {linesMissingUnit.length > 0 && <p role="alert" className="alert alert-critical">
+          Vul de eenheid in bij lijn {formatLineNumbersNl(linesMissingUnit)} voor je importeert.
+        </p>}
         {message && <p role="alert" className="alert alert-critical">{message}</p>}
-        <button className="btn btn-primary" disabled={pending || ((issues.length > 0 || payload.inferredPaths.length > 0 || reviewedTotals!.mismatches.length > 0) && !acknowledged) || (reviewedTotals!.mismatches.length > 0 && !roundingReason.trim())} onClick={approve}>{pending ? 'Importeren…' : 'Als bewerkbaar concept importeren'}</button>
+        <button className="btn btn-primary" disabled={pending || linesMissingUnit.length > 0 || ((issues.length > 0 || payload.inferredPaths.length > 0 || reviewedTotals!.mismatches.length > 0) && !acknowledged) || (reviewedTotals!.mismatches.length > 0 && !roundingReason.trim())} onClick={approve}>{pending ? 'Importeren…' : 'Als bewerkbaar concept importeren'}</button>
       </div>
     </div>
   </article>;

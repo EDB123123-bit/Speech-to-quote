@@ -3,12 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ImportBatchDashboard from '../[batchId]/ImportBatchDashboard';
+import { approveQuoteImport } from '../actions';
 import type { QuoteImportBatch, QuoteImportDocument } from '@/lib/supabase/types';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
-vi.mock('../../importeren/actions', () => ({
+vi.mock('../actions', () => ({
   approveQuoteImport: vi.fn(),
   reviewProfileSuggestion: vi.fn(),
 }));
@@ -28,10 +29,22 @@ const batch = {
   updated_at: '2026-08-21T15:38:00Z',
 } as QuoteImportBatch;
 
-const line = (description: string) => ({
-  description, notes: null, quantity: 1, unit: '', unitCode: null,
+const line = (description: string, unit = '') => ({
+  description, notes: null, quantity: 1, unit, unitCode: null,
   unitPriceCents: 7500, vatRate: 0.06, vatCategory: 'S', lineType: 'combined',
 });
+
+/** A document whose lines all carry a unit, so nothing blocks approval. */
+const readyDocument = () => document({
+  reviewed_payload: {
+    customer: { name: 'anne bauwens', address: null, email: null, phone: null },
+    quote: { number: 'O260194', issueDate: '2026-07-27', validUntil: '2026-08-26', orderReference: null },
+    lines: [line('Plaatsen kraan', 'stuk'), line('Vervangen leiding', 'm')],
+    sourceTotals: { subtotalCents: 15000, vatTotalCents: 900, totalCents: 15900 },
+    inferredPaths: [],
+  },
+  validation_result: { issues: [] },
+} as unknown as Partial<QuoteImportDocument>);
 
 const document = (overrides: Partial<QuoteImportDocument> = {}) => ({
   id: 'doc-1',
@@ -93,6 +106,37 @@ describe('ImportBatchDashboard review card', () => {
   it('lists the inferred fields for the affected line', () => {
     render(<ImportBatchDashboard batch={batch} documents={[document()]} />);
     expect(within(lineCard(0)).getByText('Afgeleide velden: Eenheid')).toBeInTheDocument();
+  });
+
+  it('blocks approval while a line has no unit and names the lines', () => {
+    render(<ImportBatchDashboard batch={batch} documents={[document()]} />);
+    expect(screen.getByText('Vul de eenheid in bij lijn 1 en 2 voor je importeert.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Als bewerkbaar concept importeren' })).toBeDisabled();
+    expect(within(lineCard(0)).getByText(/Eenheid is verplicht/)).toBeInTheDocument();
+  });
+
+  it('allows approval once every line carries a unit', () => {
+    render(<ImportBatchDashboard batch={batch} documents={[readyDocument()]} />);
+    expect(screen.queryByText(/Vul de eenheid in/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Als bewerkbaar concept importeren' })).toBeEnabled();
+  });
+
+  it('shows a returned server failure instead of an opaque error', async () => {
+    vi.mocked(approveQuoteImport).mockResolvedValue({
+      ok: false, error: 'Dit offertenummer bestaat al. Kies een nieuwe identiteit.',
+    });
+    render(<ImportBatchDashboard batch={batch} documents={[readyDocument()]} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Als bewerkbaar concept importeren' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Dit offertenummer bestaat al.');
+  });
+
+  it('reports a thrown failure in plain language rather than a React error code', async () => {
+    vi.mocked(approveQuoteImport).mockRejectedValue(new Error('Minified React error #441;'));
+    render(<ImportBatchDashboard batch={batch} documents={[readyDocument()]} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Als bewerkbaar concept importeren' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Importeren mislukt. Probeer opnieuw.');
+    expect(alert).not.toHaveTextContent('441');
   });
 
   it('offers a full-width view and a new tab for the cramped source pane', async () => {

@@ -5,6 +5,7 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { requireContractor } from '@/lib/auth/require-contractor';
 import { quoteImportEnabled } from '@/lib/quote-imports/constants';
 import { ApprovableQuotePayloadSchema } from '@/lib/quote-imports/schema';
+import { describeApprovalIssues } from '@/lib/quote-imports/approval-errors';
 import { validateReviewedTotals } from '@/lib/quote-imports/validation';
 import type {
   CatalogPriceSuggestion,
@@ -71,6 +72,10 @@ export async function discardUnregisteredUpload(input: { batchId: string; storag
   await admin.storage.from('quote-imports').remove([input.storagePath]);
 }
 
+export type ApproveQuoteImportResult =
+  | { ok: true; quote: Quote }
+  | { ok: false; error: string };
+
 export async function approveQuoteImport(input: {
   documentId: string;
   batchId: string;
@@ -78,12 +83,16 @@ export async function approveQuoteImport(input: {
   identityMode: QuoteImportIdentityMode;
   warningsAcknowledged: boolean;
   roundingOverrideReason: string | null;
-}): Promise<Quote> {
+}): Promise<ApproveQuoteImportResult> {
   assertEnabled();
-  const payload = ApprovableQuotePayloadSchema.parse(input.payload);
+  // Expected failures are returned, not thrown: Next.js replaces a thrown Server
+  // Action error with an opaque digest in production, so the reason never arrives.
+  const parsed = ApprovableQuotePayloadSchema.safeParse(input.payload);
+  if (!parsed.success) return { ok: false, error: describeApprovalIssues(parsed.error.issues) };
+  const payload = parsed.data;
   const reviewValidation = validateReviewedTotals(payload);
   if (reviewValidation.mismatches.length > 0 && (!input.warningsAcknowledged || !input.roundingOverrideReason?.trim())) {
-    throw new Error('Bevestig het verschil met de brontotalen en noteer de reden.');
+    return { ok: false, error: 'Bevestig het verschil met de brontotalen en noteer de reden.' };
   }
   const { supabase } = await requireContractor();
   const { data: saved, error: saveError } = await supabase.rpc('save_quote_import_review', {
@@ -93,13 +102,17 @@ export async function approveQuoteImport(input: {
     p_warnings_acknowledged: input.warningsAcknowledged,
     p_rounding_override_reason: input.roundingOverrideReason,
   });
-  if (saveError || !saved) throw new Error('De nagekeken offerte kon niet worden opgeslagen.');
+  if (saveError || !saved) return { ok: false, error: 'De nagekeken offerte kon niet worden opgeslagen.' };
   const { data, error } = await supabase.rpc('approve_quote_import_document', {
     p_document_id: input.documentId,
   });
   if (error || !data) {
-    if (error?.message.includes('duplicate_quote_number')) throw new Error('Dit offertenummer bestaat al. Kies een nieuwe identiteit.');
-    throw new Error('De offerte kon niet worden geïmporteerd. Controleer alle velden.');
+    return {
+      ok: false,
+      error: error?.message.includes('duplicate_quote_number')
+        ? 'Dit offertenummer bestaat al. Kies een nieuwe identiteit.'
+        : 'De offerte kon niet worden geïmporteerd. Controleer alle velden.',
+    };
   }
 
   const document = saved as QuoteImportDocument;
@@ -115,7 +128,7 @@ export async function approveQuoteImport(input: {
   revalidatePath(`/offertes/importeren/${input.batchId}`);
   revalidatePath('/offertes');
   revalidatePath('/instellingen');
-  return data as Quote;
+  return { ok: true, quote: data as Quote };
 }
 
 export async function reviewProfileSuggestion(input: {

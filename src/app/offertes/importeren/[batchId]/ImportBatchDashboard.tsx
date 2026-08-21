@@ -6,6 +6,12 @@ import { useRouter } from 'next/navigation';
 import type { QuoteImportBatch, QuoteImportDocument, QuoteImportIdentityMode } from '@/lib/supabase/types';
 import type { ReviewedQuotePayload } from '@/lib/quote-imports/schema';
 import { validateReviewedTotals } from '@/lib/quote-imports/validation';
+import {
+  groupQuoteImportIssues,
+  inferredFieldLabelsByLine,
+  type QuoteImportIssue,
+} from '@/lib/quote-imports/issues';
+import { formatLineNumbersNl } from '@/lib/quote-imports/approval-errors';
 import { formatEuros } from '@/lib/money/totals';
 import { approveQuoteImport, reviewProfileSuggestion } from '../actions';
 
@@ -97,9 +103,17 @@ function DocumentCard({ batch, document }: { batch: QuoteImportBatch; document: 
   const [acknowledged, setAcknowledged] = useState(false);
   const [roundingReason, setRoundingReason] = useState('');
   const [message, setMessage] = useState('');
+  const [wideSource, setWideSource] = useState(false);
   const [pending, startTransition] = useTransition();
-  const issues = (document.validation_result?.issues ?? []) as Array<{ code: string; severity: string; messageNl: string }>;
+  const issues = (document.validation_result?.issues ?? []) as QuoteImportIssue[];
   const reviewedTotals = payload ? validateReviewedTotals(payload) : null;
+  const grouped = groupQuoteImportIssues(issues, payload?.lines.length ?? 0);
+  const inferredByLine = inferredFieldLabelsByLine(payload?.inferredPaths ?? [], payload?.lines.length ?? 0);
+  // The approval schema requires a unit on every line, so an empty one can never
+  // import. Block it here instead of letting the server reject the whole payload.
+  const linesMissingUnit = (payload?.lines ?? [])
+    .map((line, index) => (line.unit.trim() ? null : index + 1))
+    .filter((lineNumber): lineNumber is number => lineNumber !== null);
 
   if (document.status !== 'ready_for_review' || !payload) {
     return <article className="card flex items-center justify-between gap-4"><div><strong>{document.original_filename}</strong><p className="text-sm text-muted">{statusLabel(document.status, batch.processing_mode === 'provider_batch')}</p>{document.provider_batch_status === 'in_progress' && <p className="mt-1 text-xs text-muted">Asynchrone verwerking gestart; uiterlijk na 24 uur volgt een resultaat.</p>}{document.error_message && <p className="mt-1 text-sm text-red-700">{document.error_message}</p>}</div>{document.status === 'failed' && <button className="btn btn-outline" onClick={() => void fetch(`/api/quote-imports/${document.id}/process`, { method: 'POST' }).then(() => router.refresh())}>Opnieuw</button>}{document.quote_id && <Link className="btn btn-outline" href={`/offertes/${document.quote_id}`}>Open concept</Link>}</article>;
@@ -109,20 +123,37 @@ function DocumentCard({ batch, document }: { batch: QuoteImportBatch; document: 
     setMessage('');
     startTransition(async () => {
       try {
-        const quote = await approveQuoteImport({ documentId: document.id, batchId: batch.id, payload, identityMode, warningsAcknowledged: acknowledged, roundingOverrideReason: roundingReason || null });
-        router.push(`/offertes/${quote.id}`);
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Importeren mislukt.');
+        const result = await approveQuoteImport({ documentId: document.id, batchId: batch.id, payload, identityMode, warningsAcknowledged: acknowledged, roundingOverrideReason: roundingReason || null });
+        if (!result.ok) {
+          setMessage(result.error);
+          return;
+        }
+        router.push(`/offertes/${result.quote.id}`);
+      } catch {
+        setMessage('Importeren mislukt. Probeer opnieuw.');
       }
     });
   }
 
   return <article className="card">
     <div className="mb-4"><strong>{document.original_filename}</strong><p className="text-sm text-muted">Pagina&apos;s: {document.page_count ?? '—'}</p></div>
-    <div className="grid gap-5 lg:grid-cols-2">
-      <iframe title={`Bronbestand ${document.original_filename}`} src={`/api/quote-imports/${document.id}/source`} className="min-h-[650px] w-full rounded-xl border border-line" />
+    <div className={`grid gap-5 ${wideSource ? '' : 'lg:grid-cols-2'}`}>
+      <div className={wideSource ? '' : 'lg:sticky lg:top-4 lg:self-start'}>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <button type="button" className="btn btn-quiet" aria-pressed={wideSource} onClick={() => setWideSource((current) => !current)}>
+            {wideSource ? 'Naast het formulier tonen' : 'Bron groter tonen'}
+          </button>
+          <a className="btn btn-quiet" href={`/api/quote-imports/${document.id}/source`} target="_blank" rel="noreferrer">
+            Openen in nieuw tabblad
+          </a>
+        </div>
+        <iframe title={`Bronbestand ${document.original_filename}`} src={`/api/quote-imports/${document.id}/source`} className={`w-full rounded-xl border border-line ${wideSource ? 'min-h-[85vh]' : 'min-h-[75vh]'}`} />
+      </div>
       <div className="flex flex-col gap-4">
-        {issues.length > 0 && <div className="alert alert-warning flex-col items-start">{issues.map((issue) => <p key={`${issue.code}-${issue.messageNl}`}>{issue.messageNl}</p>)}</div>}
+        {grouped.document.length > 0 && <div className="alert alert-warning flex-col items-start">{grouped.document.map((issue) => <p key={`${issue.code}-${issue.path ?? ''}-${issue.messageNl}`}>{issue.messageNl}</p>)}</div>}
+        {grouped.byLine.size > 0 && <p className="text-sm text-muted">
+          {grouped.byLine.size === 1 ? '1 offertelijn vraagt aandacht' : `${grouped.byLine.size} offertelijnen vragen aandacht`}. De opmerkingen staan bij de betrokken lijn.
+        </p>}
         <fieldset className="grid grid-cols-2 gap-3"><legend className="label col-span-full">Klant</legend>
           <TextField label="Naam" value={payload.customer.name ?? ''} onChange={(value) => setPayload({ ...payload, customer: { ...payload.customer, name: value || null } })} />
           <TextField label="E-mail" value={payload.customer.email ?? ''} onChange={(value) => setPayload({ ...payload, customer: { ...payload.customer, email: value || null } })} />
@@ -134,20 +165,40 @@ function DocumentCard({ batch, document }: { batch: QuoteImportBatch; document: 
           <TextField label="Datum" type="date" value={payload.quote.issueDate ?? ''} onChange={(value) => setPayload({ ...payload, quote: { ...payload.quote, issueDate: value || null } })} />
           <TextField label="Geldig tot" type="date" value={payload.quote.validUntil ?? ''} onChange={(value) => setPayload({ ...payload, quote: { ...payload.quote, validUntil: value || null } })} />
         </fieldset>
-        <div className="flex flex-col gap-3"><p className="label">Offertelijnen</p>{payload.lines.map((line, index) => <div key={index} className="grid grid-cols-6 gap-2 rounded-xl border border-line p-3">
+        <div className="flex flex-col gap-3"><p className="label">Offertelijnen</p>{payload.lines.map((line, index) => {
+          const lineIssues = grouped.byLine.get(index) ?? [];
+          const inferredLabels = inferredByLine.get(index) ?? [];
+          return <div key={index} className={`rounded-xl border p-3 ${lineIssues.length > 0 ? 'border-amber-300 bg-amber-50' : 'border-line'}`}>
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <strong className="text-sm">Lijn {index + 1}</strong>
+            {lineIssues.length > 0 && <span className="badge badge-warning">{lineIssues.length} {lineIssues.length === 1 ? 'opmerking' : 'opmerkingen'}</span>}
+          </div>
+          {lineIssues.length > 0 && <ul className="mb-3 flex flex-col gap-1 text-sm">
+            {lineIssues.map((issue, issueIndex) => <li key={`${issue.code}-${issue.path ?? issueIndex}`}>
+              {issue.fieldLabel && <strong>{issue.fieldLabel}: </strong>}{issue.messageNl}
+            </li>)}
+          </ul>}
+          {inferredLabels.length > 0 && <p className="mb-3 text-xs text-muted">Afgeleide velden: {inferredLabels.join(', ')}</p>}
+          {!line.unit.trim() && <p className="mb-3 text-sm font-bold text-critical">Eenheid is verplicht. Vul in wat je factureert, bijvoorbeeld stuk, m² of uur.</p>}
+          <div className="grid grid-cols-6 gap-2">
           <div className="col-span-5"><TextField label="Omschrijving" value={line.description} onChange={(value) => setPayload({ ...payload, lines: payload.lines.map((item, i) => i === index ? { ...item, description: value } : item) })} /></div><button type="button" className="text-sm font-bold text-critical" disabled={payload.lines.length === 1} onClick={() => setPayload({ ...payload, lines: payload.lines.filter((_, i) => i !== index) })}>Verwijder</button>
           <div className="col-span-6"><TextField label="Bronnotitie" value={line.notes ?? ''} onChange={(value) => setPayload({ ...payload, lines: payload.lines.map((item, i) => i === index ? { ...item, notes: value || null } : item) })} /></div>
           <TextField label="Aantal" type="number" value={String(line.quantity)} onChange={(value) => setPayload({ ...payload, lines: payload.lines.map((item, i) => i === index ? { ...item, quantity: Number(value) } : item) })} />
           <TextField label="Eenheid" value={line.unit} onChange={(value) => setPayload({ ...payload, lines: payload.lines.map((item, i) => i === index ? { ...item, unit: value } : item) })} />
           <div className="col-span-2"><TextField label="Prijs excl. btw (€)" type="number" value={String(line.unitPriceCents / 100)} onChange={(value) => setPayload({ ...payload, lines: payload.lines.map((item, i) => i === index ? { ...item, unitPriceCents: Math.round(Number(value) * 100) } : item) })} /></div>
           <label className="label col-span-2 flex flex-col gap-1">Btw<select className="field text-ink" value={`${line.vatCategory}:${line.vatRate}`} onChange={(event) => { const [category, rate] = event.target.value.split(':'); setPayload({ ...payload, lines: payload.lines.map((item, i) => i === index ? { ...item, vatCategory: category as 'S' | 'AE', vatRate: Number(rate) as 0 | 0.06 | 0.21 } : item) }); }}><option value="S:0.06">6%</option><option value="S:0.21">21%</option><option value="AE:0">Verlegging</option></select></label>
-        </div>)}<button type="button" className="btn btn-quiet" onClick={() => setPayload({ ...payload, lines: [...payload.lines, { description: '', notes: null, quantity: 1, unit: '', unitCode: null, unitPriceCents: 0, vatRate: 0.21, vatCategory: 'S', lineType: 'combined' }] })}>Offertelijn toevoegen</button></div>
+        </div>
+        </div>;
+        })}<button type="button" className="btn btn-quiet" onClick={() => setPayload({ ...payload, lines: [...payload.lines, { description: '', notes: null, quantity: 1, unit: '', unitCode: null, unitPriceCents: 0, vatRate: 0.21, vatCategory: 'S', lineType: 'combined' }] })}>Offertelijn toevoegen</button></div>
         <fieldset className="flex flex-col gap-2"><legend className="label">Identiteit van het concept</legend><label><input type="radio" checked={identityMode === 'new_identity'} onChange={() => setIdentityMode('new_identity')} /> Nieuw offertenummer en datum</label><label><input type="radio" checked={identityMode === 'preserve_source'} onChange={() => setIdentityMode('preserve_source')} /> Nummer en datums van de bron behouden</label></fieldset>
         <div className="rounded-xl bg-paper p-3 text-sm"><div className="flex justify-between"><span>Herberekend excl. btw</span><strong>{formatEuros(reviewedTotals!.totals.subtotalCents)}</strong></div><div className="flex justify-between"><span>Herberekende btw</span><strong>{formatEuros(reviewedTotals!.totals.vatTotalCents)}</strong></div><div className="flex justify-between"><span>Herberekend totaal</span><strong>{formatEuros(reviewedTotals!.totals.grandTotalCents)}</strong></div></div>
         {(issues.length > 0 || payload.inferredPaths.length > 0 || reviewedTotals!.mismatches.length > 0) && <label className="flex gap-2 text-sm"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} /> Ik heb de waarschuwingen, afgeleide velden en eventuele totaalverschillen gecontroleerd.</label>}
         {reviewedTotals!.mismatches.length > 0 && <TextField label="Reden voor verschil met de brontotalen" value={roundingReason} onChange={setRoundingReason} />}
+        {linesMissingUnit.length > 0 && <p role="alert" className="alert alert-critical">
+          Vul de eenheid in bij lijn {formatLineNumbersNl(linesMissingUnit)} voor je importeert.
+        </p>}
         {message && <p role="alert" className="alert alert-critical">{message}</p>}
-        <button className="btn btn-primary" disabled={pending || ((issues.length > 0 || payload.inferredPaths.length > 0 || reviewedTotals!.mismatches.length > 0) && !acknowledged) || (reviewedTotals!.mismatches.length > 0 && !roundingReason.trim())} onClick={approve}>{pending ? 'Importeren…' : 'Als bewerkbaar concept importeren'}</button>
+        <button className="btn btn-primary" disabled={pending || linesMissingUnit.length > 0 || ((issues.length > 0 || payload.inferredPaths.length > 0 || reviewedTotals!.mismatches.length > 0) && !acknowledged) || (reviewedTotals!.mismatches.length > 0 && !roundingReason.trim())} onClick={approve}>{pending ? 'Importeren…' : 'Als bewerkbaar concept importeren'}</button>
       </div>
     </div>
   </article>;

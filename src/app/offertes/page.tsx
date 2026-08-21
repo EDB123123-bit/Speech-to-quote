@@ -23,6 +23,13 @@ export default async function QuotesPage() {
       ])
     : [{ data: [] }, { data: [] }];
 
+  const { count: pendingReviewCount } = quoteImportEnabled()
+    ? await supabase
+        .from('quote_import_documents')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'ready_for_review')
+    : { count: 0 };
+
   const lineItemsByQuote = new Map<string, QuoteLineItem[]>();
   for (const item of (lineItemRows ?? []) as QuoteLineItem[]) {
     lineItemsByQuote.set(item.quote_id, [...(lineItemsByQuote.get(item.quote_id) ?? []), item]);
@@ -77,6 +84,16 @@ export default async function QuotesPage() {
           <small>Spreek de klus in</small>
         </span>
       </Link>
+
+      {(pendingReviewCount ?? 0) > 0 && (
+        <Link href="/offertes/importeren" className="alert alert-warning mb-7 flex items-center justify-between gap-3">
+          <span>
+            <strong>{pendingReviewCount} geïmporteerde {pendingReviewCount === 1 ? 'offerte wacht' : 'offertes wachten'} op nakijken</strong>
+            <small className="block">Ze worden pas een concept nadat je ze hebt gecontroleerd.</small>
+          </span>
+          <Icon name="chevron-right" size={20} />
+        </Link>
+      )}
 
       {quoteImportEnabled() && (
         <Link href="/offertes/importeren" className="btn btn-outline mb-7 w-full" data-tour="quote-pdf-import">

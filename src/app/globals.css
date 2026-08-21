@@ -135,6 +135,7 @@ h1, h2, h3 { color: var(--ink); font-family: var(--font-figtree), system-ui, san
 .status-pill.is-neutral { background: var(--paper-strong); color: #423e38; }
 .status-pill.is-success { background: var(--success-bg); color: var(--success); }
 .status-pill.is-warning { background: var(--warning-bg); color: var(--warning); }
+.status-pill.is-critical { background: var(--critical-bg); color: var(--critical); }
 .empty-state { padding: 2.2rem 1.25rem; border: 2px dashed #d9cfc6; border-radius: 24px; color: var(--muted); text-align: center; }
 .empty-state strong { display: block; margin-bottom: 0.35rem; color: var(--ink); font-size: 1.1rem; }
 

@@ -5,6 +5,8 @@ import type { CatalogItem, MailboxSummary, PipelineStage } from '@/lib/supabase/
 import ProfileForm from './ProfileForm';
 import { disconnectMailbox } from './actions';
 import PipelineStagesForm from './PipelineStagesForm';
+import CatalogSuggestions from '@/components/CatalogSuggestions';
+import type { CatalogPriceSuggestion } from '@/lib/supabase/types';
 
 const MAILBOX_ERRORS: Record<string, string> = {
   access_denied: 'Je hebt de toegang tot je mailbox geweigerd.',
@@ -23,9 +25,10 @@ type Props = {
 
 export default async function SettingsPage({ searchParams }: Props) {
   const { supabase, contractor } = await requireContractor();
-  const [{ data: catalogItems }, { data: stages }, mailbox, params] = await Promise.all([
+  const [{ data: catalogItems }, { data: stages }, { data: catalogSuggestions }, mailbox, params] = await Promise.all([
     supabase.from('catalog_items').select('*').order('name', { ascending: true }),
     supabase.from('pipeline_stages').select('*').order('sort_order', { ascending: true }),
+    supabase.from('catalog_price_suggestions').select('*').eq('status', 'pending').order('updated_at', { ascending: false }),
     getMailboxSummary(contractor.id),
     searchParams,
   ]);
@@ -63,6 +66,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         <p className="section-copy">
           Hiermee zet ik je gesproken beschrijving om in de juiste prijzen.
         </p>
+        <CatalogSuggestions suggestions={(catalogSuggestions ?? []) as CatalogPriceSuggestion[]} />
         <CatalogForm items={(catalogItems ?? []) as CatalogItem[]} />
       </section>
 

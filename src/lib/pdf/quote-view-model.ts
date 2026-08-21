@@ -15,6 +15,8 @@ export type QuoteViewModel = {
   customer: { name: string; address: string; email: string; phone: string };
   quoteNumber: string;
   dateNl: string;
+  validUntilNl: string | null;
+  orderReference: string;
   groups: { title: string; rows: QuoteRow[] }[];
   totals: QuoteTotals;
   showsReducedVatNotice: boolean;
@@ -39,20 +41,17 @@ export function buildQuoteViewModel(args: {
     const unitPriceCents = item.unit_price_cents ?? 0;
 
     rows.push({
-      description: item.line_type === 'materials' ? 'Materiaal' : 'Arbeid',
+      description: item.line_type === 'materials' ? 'Materiaal' : item.line_type === 'labor' ? 'Arbeid' : item.source_notes || 'Gecombineerd',
       quantity: item.quantity,
       unit: item.unit,
       unitPrice: formatEuros(unitPriceCents),
-      vatLabel: item.vat_rate === 0.06 ? '6%' : '21%',
+      vatLabel: item.vat_category === 'AE' ? 'Verlegging' : item.vat_rate === 0.06 ? '6%' : '21%',
       lineTotal: formatEuros(Math.round(item.quantity * unitPriceCents)),
     });
     grouped.set(title, rows);
   }
 
-  const created = new Date(quote.created_at);
-  const dateNl = `${String(created.getUTCDate()).padStart(2, '0')}/${String(
-    created.getUTCMonth() + 1,
-  ).padStart(2, '0')}/${created.getUTCFullYear()}`;
+  const dateNl = formatDate(quote.issue_date ?? quote.created_at);
 
   return {
     contractor: {
@@ -67,10 +66,17 @@ export function buildQuoteViewModel(args: {
       email: quote.customer_email ?? '',
       phone: quote.customer_phone ?? '',
     },
-    quoteNumber: quote.id.split('-')[0].toUpperCase(),
+    quoteNumber: quote.quote_number ?? quote.id.split('-')[0].toUpperCase(),
     dateNl,
+    validUntilNl: quote.valid_until ? formatDate(quote.valid_until) : null,
+    orderReference: quote.order_reference ?? '',
     groups: [...grouped.entries()].map(([title, rows]) => ({ title, rows })),
     totals: calculateTotals(toTotalsInput(lineItems)),
     showsReducedVatNotice: lineItems.some((item) => item.vat_rate === 0.06),
   };
+}
+
+function formatDate(value: string): string {
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return `${day}/${month}/${year}`;
 }

@@ -7,7 +7,9 @@ export function isVatRate(value: unknown): value is VatRate {
   return VAT_RATES.includes(value as VatRate);
 }
 
-export type LineType = 'materials' | 'labor';
+export type LineType = 'materials' | 'labor' | 'combined';
+export type QuoteVatRate = InvoiceVatRate;
+export type QuoteVatCategory = 'S' | 'AE';
 export type QuoteStatus = 'draft' | 'final';
 export type ClarificationStatus = 'pending' | 'resolved' | 'dismissed';
 export type PipelineStep =
@@ -86,8 +88,10 @@ export type CatalogItem = {
   contractor_id: string;
   name: string;
   unit: string;
-  materials_price_cents: number;
-  labor_price_cents: number;
+  pricing_mode?: 'split' | 'combined';
+  materials_price_cents: number | null;
+  labor_price_cents: number | null;
+  combined_price_cents?: number | null;
   vat_rate: VatRate;
   unit_code?: string | null;
   created_at: string;
@@ -106,6 +110,11 @@ export type Quote = {
   contractor_id: string;
   transcript: string | null;
   status: QuoteStatus;
+  source?: 'voice' | 'pdf_import';
+  quote_number?: string;
+  issue_date?: string;
+  valid_until?: string | null;
+  order_reference?: string | null;
   customer_name: string | null;
   customer_address: string | null;
   customer_email: string | null;
@@ -122,14 +131,103 @@ export type QuoteLineItem = {
   quote_id: string;
   catalog_item_id: string | null;
   description: string;
+  source_notes?: string | null;
   quantity: number;
   unit: string;
   unit_code?: string | null;
   unit_price_cents: number | null;
-  vat_rate: VatRate | null;
+  vat_rate: QuoteVatRate | null;
+  vat_category?: QuoteVatCategory;
   line_type: LineType;
   sort_order: number;
   created_at: string;
+};
+
+export type QuoteImportDocumentStatus =
+  | 'uploaded'
+  | 'processing'
+  | 'ready_for_review'
+  | 'importing'
+  | 'imported'
+  | 'duplicate'
+  | 'unsupported'
+  | 'failed';
+
+export type QuoteImportIdentityMode = 'preserve_source' | 'new_identity';
+export type QuoteImportProcessingMode = 'interactive' | 'provider_batch';
+
+export type QuoteImportBatch = {
+  id: string;
+  contractor_id: string;
+  requested_quote_count: number;
+  processing_mode: QuoteImportProcessingMode;
+  status: 'active' | 'completed' | 'failed';
+  file_count: number;
+  total_bytes: number;
+  profile_suggestion: Record<string, unknown> | null;
+  profile_suggestion_status: 'pending' | 'accepted' | 'rejected' | 'unavailable';
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type QuoteImportDocument = {
+  id: string;
+  batch_id: string;
+  contractor_id: string;
+  original_filename: string;
+  sha256: string;
+  semantic_hash: string | null;
+  file_size_bytes: number;
+  page_count: number | null;
+  storage_path: string | null;
+  source_deleted_at: string | null;
+  cleanup_status: 'not_applicable' | 'pending' | 'deleted' | 'failed';
+  status: QuoteImportDocumentStatus;
+  duplicate_of: string | null;
+  locked_until: string | null;
+  attempts: number;
+  extraction_model: string | null;
+  extraction_schema_version: string | null;
+  extracted_payload: Record<string, unknown> | null;
+  reviewed_payload: Record<string, unknown> | null;
+  validation_result: Record<string, unknown> | null;
+  identity_mode: QuoteImportIdentityMode | null;
+  warnings_acknowledged: boolean;
+  rounding_override_reason: string | null;
+  quote_id: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  processing_duration_ms: number | null;
+  provider_batch_id: string | null;
+  provider_batch_status: 'submitting' | 'in_progress' | 'canceling' | 'ended' | null;
+  provider_batch_expires_at: string | null;
+  provider_batch_ended_at: string | null;
+  provider_result_status: 'succeeded' | 'errored' | 'canceled' | 'expired' | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CatalogPriceSuggestion = {
+  id: string;
+  contractor_id: string;
+  normalized_description: string;
+  suggested_name: string;
+  unit: string;
+  unit_code: string;
+  vat_rate: VatRate;
+  latest_price_cents: number;
+  minimum_price_cents: number;
+  maximum_price_cents: number;
+  observation_count: number;
+  source_quote_ids: string[];
+  latest_source_date: string | null;
+  status: 'pending' | 'accepted' | 'rejected';
+  accepted_catalog_item_id: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Invoice = {

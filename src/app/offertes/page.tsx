@@ -4,6 +4,7 @@ import QuotesList, { type QuoteListItem } from '@/components/QuotesList';
 import Icon from '@/components/ui/Icon';
 import { calculateTotals, toTotalsInput } from '@/lib/money/totals';
 import type { Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
+import { quoteImportEnabled } from '@/lib/quote-imports/constants';
 
 export default async function QuotesPage() {
   const { supabase, contractor } = await requireContractor();
@@ -43,6 +44,8 @@ export default async function QuotesPage() {
       customerName: quote.customer_name ?? 'Nog geen klantnaam',
       place: placeFromAddress(quote.customer_address),
       createdAt: quote.created_at,
+      issueDate: quote.issue_date ?? quote.created_at.slice(0, 10),
+      quoteNumber: quote.quote_number ?? quote.id.split('-')[0].toUpperCase(),
       status: quote.status,
       totalCents: calculateTotals(toTotalsInput(items)).grandTotalCents,
       openQuestions: openQuestionsByQuote.get(quote.id) ?? 0,
@@ -74,6 +77,12 @@ export default async function QuotesPage() {
           <small>Spreek de klus in</small>
         </span>
       </Link>
+
+      {quoteImportEnabled() && (
+        <Link href="/offertes/importeren" className="btn btn-outline mb-7 w-full" data-tour="quote-pdf-import">
+          <Icon name="file" size={21} /> PDF-offertes importeren
+        </Link>
+      )}
 
       {quotes.length === 0 ? (
         <div className="empty-state">

@@ -91,4 +91,20 @@ describe('expandTasksToLineItems', () => {
   it('returns nothing for no tasks', () => {
     expect(expandTasksToLineItems([], [tiles])).toEqual([]);
   });
+
+  it('keeps an approved combined catalogue price as one truthful line', () => {
+    const combined: CatalogItem = {
+      ...tiles,
+      pricing_mode: 'combined',
+      materials_price_cents: null,
+      labor_price_cents: null,
+      combined_price_cents: 5250,
+    };
+    const rows = expandTasksToLineItems(
+      [{ catalogItemId: combined.id, description: combined.name, quantity: 2, unit: combined.unit }],
+      [combined],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ line_type: 'combined', description: combined.name, unit_price_cents: 5250 });
+  });
 });

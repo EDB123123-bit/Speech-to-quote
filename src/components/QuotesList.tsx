@@ -11,6 +11,8 @@ export type QuoteListItem = {
   customerName: string;
   place: string;
   createdAt: string;
+  issueDate: string;
+  quoteNumber: string;
   status: 'draft' | 'final';
   totalCents: number;
   openQuestions: number;
@@ -21,7 +23,7 @@ export default function QuotesList({ quotes }: { quotes: QuoteListItem[] }) {
   const needle = query.trim().toLocaleLowerCase('nl-BE');
   const filtered = needle
     ? quotes.filter((quote) =>
-        `${quote.customerName} ${quote.place}`.toLocaleLowerCase('nl-BE').includes(needle),
+        `${quote.customerName} ${quote.place} ${quote.quoteNumber}`.toLocaleLowerCase('nl-BE').includes(needle),
       )
     : quotes;
 
@@ -50,7 +52,7 @@ export default function QuotesList({ quotes }: { quotes: QuoteListItem[] }) {
           </div>
           <ul className="quote-list">
             {filtered.map((quote) => {
-              const formattedDate = new Date(quote.createdAt).toLocaleDateString('nl-BE', {
+              const formattedDate = new Date(`${quote.issueDate}T00:00:00`).toLocaleDateString('nl-BE', {
                 day: '2-digit',
                 month: '2-digit',
               });
@@ -62,8 +64,9 @@ export default function QuotesList({ quotes }: { quotes: QuoteListItem[] }) {
                   <Link href={`/offertes/${quote.id}`} className="quote-card-link">
                     <div>
                       <p className="quote-name">{quote.customerName}</p>
+                      <p className="text-xs text-muted">{quote.quoteNumber}</p>
                       <p className="quote-meta mobile-only">
-                        {[quote.place, new Date(quote.createdAt).toLocaleDateString('nl-BE')].filter(Boolean).join(' · ')}
+                        {[quote.place, new Date(`${quote.issueDate}T00:00:00`).toLocaleDateString('nl-BE')].filter(Boolean).join(' · ')}
                       </p>
                       {quote.openQuestions > 0 && (
                         <span className="status-pill is-warning quote-task mobile-only">

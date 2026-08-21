@@ -50,11 +50,13 @@ export default function CatalogForm({ items }: { items: CatalogItem[] }) {
             <div>
               <p className="catalog-name">{item.name}</p>
             <p className="catalog-meta nums">
-                materiaal {formatEuros(item.materials_price_cents)} · arbeid {formatEuros(item.labor_price_cents)} · {item.vat_rate === 0.06 ? '6%' : '21%'} btw · code {item.unit_code ?? 'automatisch'}
+                {item.pricing_mode === 'combined'
+                  ? `gecombineerde prijs · ${item.vat_rate === 0.06 ? '6%' : '21%'} btw`
+                  : `materiaal ${formatEuros(item.materials_price_cents ?? 0)} · arbeid ${formatEuros(item.labor_price_cents ?? 0)} · ${item.vat_rate === 0.06 ? '6%' : '21%'} btw`} · code {item.unit_code ?? 'automatisch'}
               </p>
             </div>
             <div>
-              <p className="catalog-price nums">{formatEuros(item.materials_price_cents + item.labor_price_cents)}<span className="catalog-unit">per {item.unit}</span></p>
+              <p className="catalog-price nums">{formatEuros(item.pricing_mode === 'combined' ? item.combined_price_cents ?? 0 : (item.materials_price_cents ?? 0) + (item.labor_price_cents ?? 0))}<span className="catalog-unit">per {item.unit}</span></p>
               <button type="button" onClick={() => handleDelete(item.id)} className="mt-2 text-sm font-bold text-critical underline underline-offset-2" aria-label={`Verwijder ${item.name}`}>Verwijderen</button>
             </div>
           </li>

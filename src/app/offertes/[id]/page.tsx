@@ -29,7 +29,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <p className="eyebrow">{typedQuote.status === 'final' ? 'Afgewerkte offerte' : 'Concept nakijken'}</p>
-          <h1 className="page-title">{typedQuote.customer_name ?? `Offerte ${typedQuote.id.split('-')[0].toUpperCase()}`}</h1>
+          <h1 className="page-title">{typedQuote.customer_name ?? `Offerte ${typedQuote.quote_number ?? typedQuote.id.split('-')[0].toUpperCase()}`}</h1>
           <p className="page-subtitle">
             {typedQuote.status === 'final' ? 'Klaar om te versturen' : 'Controleer de werken, prijzen en klantgegevens.'}
           </p>

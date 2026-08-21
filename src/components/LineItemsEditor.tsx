@@ -1,6 +1,6 @@
 'use client';
 
-import type { QuoteLineItem, VatRate } from '@/lib/supabase/types';
+import type { QuoteLineItem, QuoteVatCategory, QuoteVatRate } from '@/lib/supabase/types';
 import { calculateTotals, formatEuros, toTotalsInput } from '@/lib/money/totals';
 
 export { toTotalsInput };
@@ -38,7 +38,7 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                   {incomplete ? (
                     <span className="status-pill is-warning mt-2">Prijs of btw ontbreekt</span>
                   ) : (
-                    <span className="line-meta">{item.quantity} {item.unit} × {formatEuros(item.unit_price_cents!)} · {item.vat_rate === 0.06 ? '6%' : '21%'} btw</span>
+                    <span className="line-meta">{item.quantity} {item.unit} × {formatEuros(item.unit_price_cents!)} · {item.vat_category === 'AE' ? 'btw verlegd' : `${item.vat_rate === 0.06 ? '6%' : '21%'} btw`}</span>
                   )}
                 </span>
                 <span className="line-total">{lineTotal === null ? 'Invullen' : formatEuros(lineTotal)}</span>
@@ -101,11 +101,12 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                   Btw
                   <select
                     aria-label={`Btw-tarief voor ${item.description}`}
-                    value={item.vat_rate ?? ''}
+                    value={item.vat_rate === null ? '' : item.vat_category === 'AE' ? 'AE:0' : String(item.vat_rate)}
                     disabled={readOnly}
                     onChange={(e) =>
                       patch(item.id, {
-                        vat_rate: e.target.value === '' ? null : (Number(e.target.value) as VatRate),
+                        vat_rate: e.target.value === '' ? null : (Number(e.target.value.includes(':') ? e.target.value.split(':')[1] : e.target.value) as QuoteVatRate),
+                        vat_category: e.target.value.startsWith('AE:') ? ('AE' as QuoteVatCategory) : ('S' as QuoteVatCategory),
                       })
                     }
                     className="field nums text-ink"
@@ -113,7 +114,18 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                     <option value="">Kies…</option>
                     <option value="0.06">6%</option>
                     <option value="0.21">21%</option>
+                    <option value="AE:0">Verlegging van heffing</option>
                   </select>
+                </label>
+                <label className="label col-span-full flex flex-col gap-1">
+                  Notitie <span className="font-medium text-muted">— mag leeg</span>
+                  <textarea
+                    aria-label={`Notitie voor ${item.description}`}
+                    value={item.source_notes ?? ''}
+                    disabled={readOnly}
+                    onChange={(e) => patch(item.id, { source_notes: e.target.value || null })}
+                    className="field min-h-20 text-ink"
+                  />
                 </label>
                 {incomplete && (
                   <p className="alert alert-warning col-span-full">
@@ -129,8 +141,8 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
       <div className="totals-card">
         {totals.vatGroups.map((group) => (
           <div key={group.vatRate} data-testid={`vat-group-${group.vatRate}`}>
-            <div className="totals-row"><span>Werk aan {group.vatRate === 0.06 ? '6%' : '21%'} btw</span><span>{formatEuros(group.subtotalCents)}</span></div>
-            <div className="totals-row"><span>Btw {group.vatRate === 0.06 ? '6%' : '21%'}</span><span>{formatEuros(group.vatAmountCents)}</span></div>
+            <div className="totals-row"><span>{group.vatRate === 0 ? 'Werk met verlegging' : `Werk aan ${group.vatRate === 0.06 ? '6%' : '21%'} btw`}</span><span>{formatEuros(group.subtotalCents)}</span></div>
+            <div className="totals-row"><span>{group.vatRate === 0 ? 'Btw verlegd' : `Btw ${group.vatRate === 0.06 ? '6%' : '21%'}`}</span><span>{formatEuros(group.vatAmountCents)}</span></div>
           </div>
         ))}
         <div className="totals-grand">

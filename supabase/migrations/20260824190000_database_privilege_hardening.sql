@@ -12,3 +12,4 @@ revoke all on public.material_requirements from anon, authenticated;
 grant select, update on public.material_requirements to authenticated;
 
 revoke all on public.quotes from anon;
+grant select on public.quotes to authenticated;

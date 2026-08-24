@@ -3,7 +3,7 @@ select plan(14);
 
 select has_column('public', 'quotes', 'quote_kind', 'quotes identify standard and meerwerk kinds');
 select has_column('public', 'quotes', 'parent_quote_id', 'change orders link to an original quote');
-select has_index('public', 'quotes_parent_quote_idx', 'parent quote lookup is indexed');
+select has_index('public', 'quotes', 'quotes_parent_quote_idx', 'parent quote lookup is indexed');
 select ok((select relrowsecurity from pg_class where oid = 'public.quotes'::regclass), 'quote RLS remains enabled');
 select has_function('public', 'create_meerwerk_quote', ARRAY['uuid', 'uuid'], 'server change-order creation RPC exists');
 select ok(not has_function_privilege('anon', 'public.create_meerwerk_quote(uuid, uuid)', 'EXECUTE'), 'anon cannot create change orders');

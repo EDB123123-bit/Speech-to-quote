@@ -1,5 +1,5 @@
 import { requireContractor } from '@/lib/auth/require-contractor';
-import { calculateTotals, toTotalsInput } from '@/lib/money/totals';
+import { summarizePricing } from '@/lib/money/totals';
 import type { PipelineStage, Quote, QuoteLineItem } from '@/lib/supabase/types';
 import type { QuoteWithTotal } from '@/lib/quotes/group-by-stage';
 import KanbanBoard from '@/components/kanban/KanbanBoard';
@@ -29,7 +29,8 @@ export default async function PijplijnPage() {
 
   const quotesWithTotals: QuoteWithTotal[] = quoteRows.map((quote) => ({
     ...quote,
-    grandTotalCents: calculateTotals(toTotalsInput(lineItemsByQuote.get(quote.id) ?? [])).grandTotalCents,
+    grandTotalCents: (() => { const p = summarizePricing(lineItemsByQuote.get(quote.id) ?? []); return p.state === 'unpriced' ? null : p.knownTotalCents; })(),
+    pricingState: summarizePricing(lineItemsByQuote.get(quote.id) ?? []).state,
   }));
 
   return (

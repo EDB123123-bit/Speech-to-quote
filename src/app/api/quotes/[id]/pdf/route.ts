@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireContractor, UnauthorizedError } from '@/lib/auth/require-contractor';
 import { renderQuotePdf } from '@/lib/pdf/render';
 import { logPipelineEvent } from '@/lib/logging/pipeline-events';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 import type { Contractor, Quote, QuoteLineItem } from '@/lib/supabase/types';
 
 export const runtime = 'nodejs';
@@ -26,10 +27,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data: quote } = await supabase.from('quotes').select('*').eq('id', id).single();
   if (!quote) return NextResponse.json({ error: 'Offerte niet gevonden' }, { status: 404 });
 
-  // Only finalized quotes may ever be downloaded here. Rendering a draft
+  // Only finalized/sent/accepted quotes may ever be downloaded here. Rendering a draft
   // would persist its (possibly unpriced) PDF as pdf_path, which a later
   // finalize whose own PDF step fails would then serve as if it were final.
-  if ((quote as Quote).status !== 'final') {
+  if (!['final', 'sent', 'accepted'].includes((quote as Quote).status)) {
     return NextResponse.json({ error: 'Deze offerte is nog niet afgewerkt.' }, { status: 409 });
   }
 
@@ -40,23 +41,33 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     try {
       const { data: lineItems } = await supabase
         .from('quote_line_items').select('*').eq('quote_id', id);
+      const { data: parent } = (quote as Quote).parent_quote_id
+        ? await supabase.from('quotes').select('quote_number').eq('id', (quote as Quote).parent_quote_id as string).maybeSingle()
+        : { data: null };
 
       const pdf = await renderQuotePdf({
         contractor,
         quote: quote as Quote,
         lineItems: (lineItems ?? []) as QuoteLineItem[],
+        originalQuoteNumber: parent?.quote_number ?? null,
       });
 
       path = `${contractor.id}/${id}.pdf`;
-      const { error: uploadError } = await supabase.storage
+      const admin = createAdminSupabase();
+      const { error: uploadError } = await admin.storage
         .from('quote-pdfs')
-        .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
-      if (uploadError) throw new Error(uploadError.message);
+        .upload(path, pdf, { contentType: 'application/pdf', upsert: false });
+      if (uploadError) {
+        const existing = await admin.storage.from('quote-pdfs').download(path);
+        if (existing.error || !existing.data) throw new Error(uploadError.message);
+      }
 
-      const { error: pdfPathError } = await supabase
-        .from('quotes')
-        .update({ pdf_path: path })
-        .eq('id', id);
+      const { error: pdfPathError } = await admin
+        .rpc('set_quote_pdf_path', {
+          p_quote_id: id,
+          p_contractor_id: contractor.id,
+          p_pdf_path: path,
+        });
       if (pdfPathError) throw new Error(pdfPathError.message);
 
       await logPipelineEvent({

@@ -22,10 +22,10 @@ beforeEach(() => {
 });
 
 describe('RecordQuote', () => {
-  it('tells the contractor to set up a price list first when the catalog is empty', () => {
+  it('allows recording without a catalogue', () => {
     render(<RecordQuote hasCatalogItems={false} />);
-    expect(screen.getByRole('alert')).toHaveTextContent(/prijslijst/i);
-    expect(screen.getByRole('button', { name: /opnemen/i })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /opnemen/i })).toBeEnabled();
   });
 
   it('navigates to the new quote after a successful upload', async () => {
@@ -38,6 +38,22 @@ describe('RecordQuote', () => {
     await userEvent.click(screen.getByRole('button', { name: /opnemen/i }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/offertes/quote-9'));
+  });
+
+  it('includes the accepted parent when recording a voice change order', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ quoteId: 'change-order-1' }),
+    });
+
+    render(<RecordQuote parentQuoteId="parent-1" />);
+    await userEvent.click(screen.getByRole('button', { name: /opnemen/i }));
+
+    await waitFor(() => {
+      const body = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as FormData;
+      expect(body.get('parentQuoteId')).toBe('parent-1');
+      expect(push).toHaveBeenCalledWith('/offertes/change-order-1');
+    });
   });
 
   it('shows the server error message when the upload fails', async () => {

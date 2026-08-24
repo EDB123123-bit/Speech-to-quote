@@ -1,5 +1,5 @@
 import { requireContractor } from '@/lib/auth/require-contractor';
-import { calculateTotals, toTotalsInput } from '@/lib/money/totals';
+import { summarizePricing } from '@/lib/money/totals';
 import type { Quote, QuoteLineItem } from '@/lib/supabase/types';
 import { countQuotesWithoutCustomer, deriveCustomers, type CustomerSummary } from './derive';
 
@@ -30,7 +30,7 @@ export async function loadCustomers(supabase: SupabaseClient): Promise<{
   }
   const totalCentsByQuoteId = new Map(quotes.map((quote) => [
     quote.id,
-    calculateTotals(toTotalsInput(itemsByQuote.get(quote.id) ?? [])).grandTotalCents,
+    (() => { const p = summarizePricing(itemsByQuote.get(quote.id) ?? []); return p.state === 'unpriced' ? null : p.knownTotalCents; })(),
   ]));
 
   return {

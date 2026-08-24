@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build && npm run verify:quote-import-runtime",
+    "build": "next build --webpack && npm run verify:quote-import-runtime",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

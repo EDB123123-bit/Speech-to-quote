@@ -50,6 +50,16 @@ describe('finalizeQuote', () => {
     expect(deps.renderPdf).not.toHaveBeenCalled();
   });
 
+  it.each(['final', 'sent', 'accepted'] as const)('does not regenerate the PDF for a %s quote', async (status) => {
+    const deps = makeDeps({ loadQuote: vi.fn().mockResolvedValue({ ...draftQuote, status }) });
+    const result = await finalizeQuote(deps, 'q1');
+
+    expect(result.ok).toBe(false);
+    expect(deps.updateStatusToFinal).not.toHaveBeenCalled();
+    expect(deps.renderPdf).not.toHaveBeenCalled();
+    expect(deps.uploadPdf).not.toHaveBeenCalled();
+  });
+
   it('returns a distinct 404 result when the quote does not exist', async () => {
     const deps = makeDeps({ loadQuote: vi.fn().mockResolvedValue(null) });
     const result = await finalizeQuote(deps, 'missing');

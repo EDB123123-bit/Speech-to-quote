@@ -11,7 +11,7 @@ export type CustomerQuoteSummary = {
   status: QuoteStatus;
   createdAt: string;
   issueDate: string;
-  totalCents: number;
+  totalCents: number | null;
 };
 
 export type CustomerSummary = {
@@ -23,15 +23,15 @@ export type CustomerSummary = {
   quoteCount: number;
   draftCount: number;
   finalCount: number;
-  totalCents: number;
+  totalCents: number | null;
   lastQuoteAt: string;
   quotes: CustomerQuoteSummary[];
 };
 
 /**
- * There is no customers table: a customer only exists as the name repeated on
- * each quote. Names are matched case-, accent- and spacing-insensitively so that
- * "Anne Bauwens" and "anne  bauwens" resolve to one person.
+ * Legacy quote lists can still be grouped without a customer join. Names are
+ * matched case-, accent- and spacing-insensitively so that "Anne Bauwens" and
+ * "anne  bauwens" resolve to one person while older snapshots are backfilled.
  */
 export function normalizeCustomerName(name: string): string {
   return name
@@ -61,7 +61,7 @@ function pickFirstFilled(values: (string | null)[]): string | null {
  */
 export function deriveCustomers(
   quotes: CustomerQuoteRow[],
-  totalCentsByQuoteId: Map<string, number>,
+  totalCentsByQuoteId: Map<string, number | null>,
 ): CustomerSummary[] {
   const groups = new Map<string, { rows: CustomerQuoteRow[] }>();
 
@@ -83,7 +83,7 @@ export function deriveCustomers(
       status: quote.status,
       createdAt: quote.created_at,
       issueDate: quote.issue_date ?? quote.created_at.slice(0, 10),
-      totalCents: totalCentsByQuoteId.get(quote.id) ?? 0,
+      totalCents: totalCentsByQuoteId.get(quote.id) ?? null,
     }));
 
     return {
@@ -96,8 +96,8 @@ export function deriveCustomers(
       phone: pickFirstFilled(byNewest.map((quote) => quote.customer_phone)),
       quoteCount: byNewest.length,
       draftCount: byNewest.filter((quote) => quote.status === 'draft').length,
-      finalCount: byNewest.filter((quote) => quote.status === 'final').length,
-      totalCents: quoteSummaries.reduce((sum, quote) => sum + quote.totalCents, 0),
+      finalCount: byNewest.filter((quote) => quote.status !== 'draft').length,
+      totalCents: quoteSummaries.some((quote) => quote.totalCents === null) ? null : quoteSummaries.reduce((sum, quote) => sum + (quote.totalCents ?? 0), 0),
       lastQuoteAt: byNewest[0].created_at,
       quotes: quoteSummaries,
     };

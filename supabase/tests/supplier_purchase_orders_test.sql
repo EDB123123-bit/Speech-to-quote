@@ -1,0 +1,37 @@
+begin;
+select plan(29);
+
+select has_table('public', 'supplier_orders', 'supplier orders table exists');
+select has_table('public', 'supplier_order_lines', 'supplier order lines table exists');
+select has_column('public', 'supplier_orders', 'quote_id', 'each order links one exact quote');
+select has_column('public', 'supplier_orders', 'supplier_id', 'each order links one supplier');
+select has_column('public', 'supplier_orders', 'status', 'orders have draft/sent status');
+select has_column('public', 'supplier_orders', 'pdf_sha256', 'sent PDFs have an integrity hash');
+select has_column('public', 'supplier_order_lines', 'material_requirement_id', 'lines retain source requirement links');
+select has_column('public', 'supplier_order_lines', 'purchase_unit_price_cents', 'purchase prices are independent and optional');
+select ok((select relrowsecurity from pg_class where oid = 'public.supplier_orders'::regclass), 'supplier order RLS is enabled');
+select ok((select relrowsecurity from pg_class where oid = 'public.supplier_order_lines'::regclass), 'supplier order line RLS is enabled');
+select ok((select count(*) from pg_constraint where conrelid = 'public.supplier_orders'::regclass and conname = 'supplier_orders_status_check') = 1, 'only draft and sent statuses are allowed');
+select ok((select count(*) from pg_constraint where conrelid = 'public.supplier_order_lines'::regclass and conname = 'supplier_order_lines_purchase_price_check') = 1, 'purchase prices allow zero and reject negatives');
+select ok((select count(*) from pg_indexes where indexname = 'supplier_order_lines_requirement_unique') = 1, 'a requirement cannot be assigned twice');
+select ok((select count(*) from pg_trigger where tgrelid = 'public.supplier_orders'::regclass and tgname = 'supplier_orders_validate') = 1, 'order validation trigger exists');
+select ok((select count(*) from pg_trigger where tgrelid = 'public.supplier_order_lines'::regclass and tgname = 'supplier_order_lines_validate') = 1, 'line validation trigger exists');
+select ok((select count(*) from pg_trigger where tgrelid = 'public.material_requirements'::regclass and tgname = 'material_requirements_supplier_order_status_guard') = 1, 'requirements cannot be marked ordered outside send transition');
+select has_function('public', 'create_supplier_order', ARRAY['uuid', 'uuid', 'uuid', 'uuid[]', 'text', 'text'], 'atomic draft creation RPC exists');
+select has_function('public', 'save_supplier_order_draft', ARRAY['uuid', 'uuid', 'text', 'text', 'jsonb'], 'draft edit RPC exists');
+select has_function('public', 'mark_supplier_order_sent', ARRAY['uuid', 'uuid', 'text', 'text', 'text', 'text', 'text'], 'send finalization RPC exists');
+select has_function('public', 'cancel_supplier_order', ARRAY['uuid'], 'cancel RPC exists to release draft assignments');
+select ok(has_table_privilege('authenticated', 'public.supplier_orders', 'SELECT'), 'authenticated contractors can read own orders');
+select ok(has_table_privilege('authenticated', 'public.supplier_orders', 'INSERT'), 'authenticated contractors can create drafts');
+select ok(has_table_privilege('authenticated', 'public.supplier_orders', 'UPDATE'), 'authenticated contractors can edit drafts');
+select ok(has_table_privilege('authenticated', 'public.supplier_orders', 'DELETE'), 'authenticated contractors can delete drafts');
+select ok(not has_table_privilege('anon', 'public.supplier_orders', 'SELECT'), 'anon cannot read orders');
+select ok(not has_table_privilege('anon', 'public.supplier_order_lines', 'SELECT'), 'anon cannot read order lines');
+select ok(has_function_privilege('authenticated', 'public.create_supplier_order(uuid, uuid, uuid, uuid[], text, text)', 'EXECUTE'), 'authenticated can use draft creation RPC');
+select ok(not has_function_privilege('authenticated', 'public.mark_supplier_order_sent(uuid, uuid, text, text, text, text, text)', 'EXECUTE'), 'authenticated cannot bypass server send transition');
+select ok(has_function_privilege('service_role', 'public.mark_supplier_order_sent(uuid, uuid, text, text, text, text, text)', 'EXECUTE'), 'server role can finalize sent orders');
+select ok(has_function_privilege('authenticated', 'public.cancel_supplier_order(uuid)', 'EXECUTE'), 'authenticated can cancel drafts');
+select ok((select count(*) from storage.buckets where id = 'supplier-order-pdfs' and public = false) = 1, 'supplier order PDF bucket is private');
+
+select * from finish();
+rollback;

@@ -15,10 +15,11 @@ export async function getOnboardingStatus(): Promise<{ show: boolean }> {
 export async function completeOnboarding(): Promise<void> {
   try {
     const { supabase, contractor } = await requireContractor();
-    await supabase
+    const { error } = await supabase
       .from('contractors')
       .update({ onboarding_completed_at: new Date().toISOString() })
       .eq('id', contractor.id);
+    if (error) throw new Error('De uitlegstatus kon niet worden opgeslagen.');
   } catch (error) {
     if (error instanceof UnauthorizedError) return;
     throw error;

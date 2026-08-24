@@ -1,10 +1,13 @@
 import { z } from 'zod';
 
 export const ExtractedTaskSchema = z.object({
-  catalogItemId: z.string().nullable(),
+  catalogItemId: z.string().nullable().optional(),
   description: z.string().min(1),
-  quantity: z.number().positive(),
-  unit: z.string().min(1),
+  quantity: z.number().positive().nullable(),
+  unit: z.string().min(1).nullable(),
+  unitPriceCents: z.number().int().nonnegative().nullable().default(null),
+  priceExplicit: z.boolean().default(false),
+  classification: z.enum(['material', 'labor_service']).default('labor_service'),
 });
 
 export const ClarificationSchema = z.object({

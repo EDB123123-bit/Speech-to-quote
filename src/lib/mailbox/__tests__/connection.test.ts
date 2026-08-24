@@ -20,7 +20,7 @@ import {
 
 function mailboxClient(result: { data: unknown; error: unknown }) {
   const maybeSingle = vi.fn().mockResolvedValue(result);
-  const eq = vi.fn(() => ({ maybeSingle }));
+  const eq = vi.fn(() => ({ eq, maybeSingle }));
   const select = vi.fn(() => ({ eq }));
   return { from: vi.fn(() => ({ select })) };
 }

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { requireContractor } from '@/lib/auth/require-contractor';
 import QuotesList, { type QuoteListItem } from '@/components/QuotesList';
 import Icon from '@/components/ui/Icon';
-import { calculateTotals, toTotalsInput } from '@/lib/money/totals';
+import { summarizePricing } from '@/lib/money/totals';
 import type { Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 import { quoteImportEnabled } from '@/lib/quote-imports/constants';
 
@@ -54,7 +54,9 @@ export default async function QuotesPage() {
       issueDate: quote.issue_date ?? quote.created_at.slice(0, 10),
       quoteNumber: quote.quote_number ?? quote.id.split('-')[0].toUpperCase(),
       status: quote.status,
-      totalCents: calculateTotals(toTotalsInput(items)).grandTotalCents,
+      quoteKind: quote.quote_kind ?? 'standard',
+      totalCents: (() => { const pricing = summarizePricing(items); return pricing.state === 'unpriced' ? null : pricing.knownTotalCents; })(),
+      pricingState: summarizePricing(items).state,
       openQuestions: openQuestionsByQuote.get(quote.id) ?? 0,
     };
   });
@@ -64,7 +66,8 @@ export default async function QuotesPage() {
   startOfWeek.setHours(0, 0, 0, 0);
   startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7));
   const sentThisWeek = quotes.filter(
-    (quote) => quote.status === 'final' && new Date(quote.created_at) >= startOfWeek,
+    (quote) => (quote.status === 'sent' || quote.status === 'accepted')
+      && new Date(quote.sent_at ?? quote.created_at) >= startOfWeek,
   ).length;
 
   return (
@@ -73,11 +76,11 @@ export default async function QuotesPage() {
         <div>
           <p className="eyebrow">{contractor.company_name}</p>
           <h1 className="page-title">Offertes</h1>
-          <p className="page-subtitle">{openCount} open · {sentThisWeek} afgewerkt deze week</p>
+          <p className="page-subtitle">{openCount} open · {sentThisWeek} verstuurd deze week</p>
         </div>
       </header>
 
-      <Link href="/offertes/nieuw" className="hero-cta mb-7">
+      <Link href="/offertes/nieuw" className="hero-cta mb-7" data-tour="new-quote">
         <span className="hero-cta-icon"><Icon name="microphone" size={30} /></span>
         <span>
           <strong>Nieuwe offerte</strong>

@@ -4,7 +4,10 @@ import { requireContractor, UnauthorizedError } from '@/lib/auth/require-contrac
 import { logPipelineEvent, serialiseError } from '@/lib/logging/pipeline-events';
 import { MailboxError } from '@/lib/mailbox/errors';
 import { sendQuoteEmail } from '@/lib/mailbox/send';
+import { getAppUrl } from '@/lib/mailbox/config';
 import { getOrCreateQuotePdf } from '@/lib/pdf/get-or-create';
+import { createAdminSupabase } from '@/lib/supabase/admin';
+import { acceptanceUrl, issueQuoteAcceptanceToken } from '@/lib/quotes/acceptance-token';
 import type { Quote } from '@/lib/supabase/types';
 
 export const runtime = 'nodejs';
@@ -51,7 +54,7 @@ export async function POST(
   if (!data) return NextResponse.json({ error: 'Offerte niet gevonden' }, { status: 404 });
 
   const quote = data as Quote;
-  if (quote.status !== 'final') {
+  if (quote.status !== 'final' && quote.status !== 'sent') {
     return NextResponse.json(
       { error: 'Werk de offerte eerst af voordat je ze verstuurt.' },
       { status: 409 },
@@ -59,8 +62,14 @@ export async function POST(
   }
 
   try {
+    const admin = createAdminSupabase();
+    const token = await issueQuoteAcceptanceToken(admin, quote.id);
+    const publicUrl = acceptanceUrl(getAppUrl(new URL(request.url).origin), token);
+    const customerMessage = `${parsed.data.message.trim()}\n\nOfferte bekijken en aanvaarden:\n${publicUrl}`;
     const { pdf } = await getOrCreateQuotePdf({
-      supabase: auth.supabase,
+      // Final/sent quotes are commercially frozen. The server-owned PDF path
+      // write therefore uses the service-role client, never the browser client.
+      supabase: admin,
       contractor: auth.contractor,
       quote,
     });
@@ -68,10 +77,19 @@ export async function POST(
       userId: auth.contractor.id,
       to: parsed.data.recipient,
       subject: parsed.data.subject,
-      message: parsed.data.message,
+      message: customerMessage,
       pdf,
       filename: `offerte-${quote.id.slice(0, 8)}.pdf`,
     });
+
+    const { error: lifecycleError } = await admin.rpc('mark_quote_sent', {
+      p_quote_id: quote.id,
+      p_contractor_id: auth.contractor.id,
+      p_recipient: parsed.data.recipient,
+      p_provider: result.provider,
+      p_message_id: result.messageId,
+    });
+    if (lifecycleError) throw new Error(`Verzendstatus opslaan mislukt: ${lifecycleError.message}`);
 
     await logPipelineEvent({
       quoteId: quote.id,
@@ -83,11 +101,13 @@ export async function POST(
         provider: result.provider,
         from: result.from,
         messageId: result.messageId,
+        status: 'sent',
       },
     });
 
     return NextResponse.json({
       ok: true,
+      status: 'sent',
       provider: result.provider,
       from: result.from,
     });

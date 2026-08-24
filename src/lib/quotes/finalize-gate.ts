@@ -20,7 +20,7 @@ export function checkFinalizeGate(input: {
 }): FinalizeBlocker[] {
   const blockers: FinalizeBlocker[] = [];
 
-  if (input.quote.status === 'final') {
+  if (input.quote.status !== 'draft') {
     blockers.push({ code: 'already_final', messageNl: 'Deze offerte is al afgewerkt.' });
   }
 
@@ -28,13 +28,15 @@ export function checkFinalizeGate(input: {
     blockers.push({ code: 'no_line_items', messageNl: 'Voeg minstens één offertelijn toe.' });
   }
 
+  // An unknown selling price is valid in V1. When a price is present, VAT
+  // treatment must be explicit; €0 is a real price and is therefore valid.
   const incomplete = input.lineItems.filter(
-    (item) => item.unit_price_cents === null || item.vat_rate === null,
+    (item) => item.unit_price_cents !== null && (item.vat_rate === null || ((item.line_kind ?? 'detailed') === 'detailed' && (item.quantity === null || item.unit === null))),
   );
   if (incomplete.length > 0) {
     blockers.push({
       code: 'incomplete_line_item',
-      messageNl: `${incomplete.length} offertelijn(en) missen nog een prijs of btw-tarief.`,
+      messageNl: `${incomplete.length} geprijsde offertelijn(en) missen nog btw of aantallen/eenheden.`,
     });
   }
 

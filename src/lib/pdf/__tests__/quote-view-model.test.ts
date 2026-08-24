@@ -100,4 +100,40 @@ describe('buildQuoteViewModel', () => {
     expect(model.contractor.address).toBe('');
     expect(model.contractor.vatNumber).toBe('');
   });
+
+  it('keeps unknown prices out of totals and displays them as unknown', () => {
+    const model = buildQuoteViewModel({
+      contractor,
+      quote,
+      lineItems: [line({ unit_price_cents: null, vat_rate: null })],
+    });
+    expect(model.hasPricedLines).toBe(false);
+    expect(model.hasUnpricedLines).toBe(true);
+    expect(model.groups[0].rows[0].unitPrice).toBe('Onbekend');
+    expect(model.groups[0].rows[0].lineTotal).toBe('Prijs nog te bepalen');
+    expect(model.totals.grandTotalCents).toBe(0);
+  });
+
+  it('keeps an explicit zero price distinct from an unknown price', () => {
+    const model = buildQuoteViewModel({
+      contractor,
+      quote,
+      lineItems: [line({ unit_price_cents: 0, vat_rate: 0.21 })],
+    });
+    expect(model.hasPricedLines).toBe(true);
+    expect(model.hasUnpricedLines).toBe(false);
+    expect(model.groups[0].rows[0].unitPrice).toBe('€ 0,00');
+    expect(model.groups[0].rows[0].lineTotal).toBe('€ 0,00');
+  });
+
+  it('carries the original quote reference for meerwerk PDFs', () => {
+    const model = buildQuoteViewModel({
+      contractor,
+      quote: { ...quote, quote_kind: 'meerwerk', parent_quote_id: 'parent-1' },
+      lineItems: [line()],
+      originalQuoteNumber: 'OFF-42',
+    });
+    expect(model.quoteKind).toBe('meerwerk');
+    expect(model.originalQuoteNumber).toBe('OFF-42');
+  });
 });

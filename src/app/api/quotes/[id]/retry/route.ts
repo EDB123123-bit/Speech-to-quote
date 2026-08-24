@@ -5,7 +5,8 @@ import { extractQuoteTasks } from '@/lib/ai/extract';
 import { expandTasksToLineItems } from '@/lib/quotes/expand';
 import { extractWithCatalogFallback } from '@/lib/quotes/extract-with-fallback';
 import { logPipelineEvent } from '@/lib/logging/pipeline-events';
-import type { CatalogItem, Quote, QuoteClarification } from '@/lib/supabase/types';
+import { applyHistoricalSuggestions, loadHistoricalPriceCandidates } from '@/lib/quotes/historical-suggestions-server';
+import type { Quote, QuoteClarification } from '@/lib/supabase/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -31,28 +32,22 @@ export async function POST(
 
   const [
     { data: quote, error: quoteError },
-    { data: catalog, error: catalogError },
     { data: lineItems, error: lineItemLoadError },
     { data: clarifications, error: clarificationLoadError },
   ] = await Promise.all([
     supabase.from('quotes').select('*').eq('id', id).eq('contractor_id', contractorId).single(),
-    supabase.from('catalog_items').select('*').eq('contractor_id', contractorId),
     supabase.from('quote_line_items').select('*').eq('quote_id', id).order('sort_order'),
     supabase.from('quote_clarifications').select('*').eq('quote_id', id),
   ]);
 
   if (quoteError) return NextResponse.json({ error: 'Offerte kon niet geladen worden.' }, { status: 500 });
   if (!quote) return NextResponse.json({ error: 'Offerte niet gevonden' }, { status: 404 });
-  if (catalogError) return NextResponse.json({ error: 'Prijslijst laden mislukt' }, { status: 500 });
   if (lineItemLoadError || clarificationLoadError) {
     return NextResponse.json({ error: 'De offertegegevens konden niet volledig geladen worden.' }, { status: 500 });
   }
-  if (quote.status === 'final') return NextResponse.json({ error: 'Deze offerte is al afgewerkt' }, { status: 409 });
+  if (quote.status !== 'draft') return NextResponse.json({ error: 'Deze offerte is al afgewerkt' }, { status: 409 });
   if ((lineItems ?? []).length > 0) {
     return NextResponse.json({ error: 'Deze offerte heeft al offertelijnen.' }, { status: 409 });
-  }
-  if (!catalog || catalog.length === 0) {
-    return NextResponse.json({ error: 'Voeg eerst minstens één item toe aan je prijslijst.' }, { status: 409 });
   }
 
   const typedQuote = quote as Quote;
@@ -95,12 +90,11 @@ export async function POST(
       return NextResponse.json({ error: 'Prijsverwerking is nog niet ingesteld.' }, { status: 503 });
     }
 
-    const outcome = await extractWithCatalogFallback({
-      transcript,
-      catalog: catalog as CatalogItem[],
-      extract: extractQuoteTasks,
-    });
-    const rows = expandTasksToLineItems(outcome.extraction.tasks, catalog as CatalogItem[]);
+    const outcome = await extractWithCatalogFallback({ transcript, extract: extractQuoteTasks });
+    const rows = applyHistoricalSuggestions(
+      expandTasksToLineItems(outcome.extraction.tasks),
+      await loadHistoricalPriceCandidates(supabase, contractorId, id),
+    );
 
     if (rows.length > 0) {
       const { error: lineItemError } = await supabase
@@ -153,7 +147,7 @@ export async function POST(
       detail: { retry: true, error: String(error) },
     });
     return NextResponse.json(
-      { error: step === 'transcribe' ? 'De opname kon niet opnieuw uitgeschreven worden.' : 'De prijslijst kon niet opnieuw toegepast worden.' },
+      { error: step === 'transcribe' ? 'De opname kon niet opnieuw uitgeschreven worden.' : 'De offerte kon niet opnieuw verwerkt worden.' },
       { status: 502 },
     );
   }

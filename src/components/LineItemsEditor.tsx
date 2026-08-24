@@ -1,7 +1,9 @@
 'use client';
 
-import type { QuoteLineItem, QuoteVatCategory, QuoteVatRate } from '@/lib/supabase/types';
-import { calculateTotals, formatEuros, toTotalsInput } from '@/lib/money/totals';
+import { useState } from 'react';
+import type { LineClassification, QuoteLineItem, QuoteVatCategory, QuoteVatRate } from '@/lib/supabase/types';
+import { formatEuros, summarizePricing, toTotalsInput } from '@/lib/money/totals';
+import { removeLineItem } from '@/app/offertes/[id]/line-item-actions';
 
 export { toTotalsInput };
 
@@ -12,36 +14,58 @@ type Props = {
 };
 
 export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
-  const totals = calculateTotals(toTotalsInput(items));
+  const pricing = summarizePricing(items);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   function patch(id: string, changes: Partial<QuoteLineItem>) {
     onChange(items.map((item) => (item.id === id ? { ...item, ...changes } : item)));
+  }
+
+  async function remove(item: QuoteLineItem) {
+    setRemovingId(item.id);
+    setRemoveError(null);
+    try {
+      await removeLineItem(item.id);
+      onChange(items.filter((candidate) => candidate.id !== item.id));
+    } catch {
+      setRemoveError('Verwijderen mislukt. Probeer opnieuw.');
+    } finally {
+      setRemovingId(null);
+    }
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="line-items">
         {items.map((item, index) => {
-          const incomplete = item.unit_price_cents === null || item.vat_rate === null;
+          const unpriced = item.unit_price_cents === null;
+          const lineKind = item.line_kind ?? 'detailed';
+          const incomplete = item.unit_price_cents !== null && item.vat_rate === null;
+          const unclassified = item.classification === 'unclassified' || item.classification == null;
+          const needsReview = unpriced || incomplete || unclassified;
           const lineTotal = item.unit_price_cents === null
             ? null
-            : Math.round(item.quantity * item.unit_price_cents);
+            : Math.round((lineKind === 'simple' ? 1 : item.quantity ?? 0) * item.unit_price_cents);
           return (
             <details
               key={item.id}
               open={items.length === 1 || index === 0}
-              className={`line-item ${incomplete ? 'needs-work' : ''}`}
+              className={`line-item ${needsReview ? 'needs-work' : ''}`}
             >
               <summary className="line-summary">
                 <span>
                   <span className="line-description">{item.description || 'Nieuwe offertelijn'}</span>
                   {incomplete ? (
-                    <span className="status-pill is-warning mt-2">Prijs of btw ontbreekt</span>
+                    <span className="status-pill is-warning mt-2">Btw ontbreekt</span>
+                  ) : unpriced ? (
+                    <span className="status-pill is-warning mt-2">Prijs toevoegen / verifiëren</span>
                   ) : (
-                    <span className="line-meta">{item.quantity} {item.unit} × {formatEuros(item.unit_price_cents!)} · {item.vat_category === 'AE' ? 'btw verlegd' : `${item.vat_rate === 0.06 ? '6%' : '21%'} btw`}</span>
+                    <span className="line-meta">{lineKind === 'simple' ? 'Totaalprijs' : `${item.quantity ?? '—'} ${item.unit ?? ''} ×`} {formatEuros(item.unit_price_cents!)} · {item.vat_category === 'AE' ? 'btw verlegd' : `${item.vat_rate === 0.06 ? '6%' : '21%'} btw`}{item.price_source === 'historical_suggestion' ? ' · Voorgesteld op basis van eerdere offerte' : ''}</span>
                   )}
+                  {unclassified && <span className="status-pill is-warning mt-2">Soort werk nakijken</span>}
                 </span>
-                <span className="line-total">{lineTotal === null ? 'Invullen' : formatEuros(lineTotal)}</span>
+                <span className="line-total">{lineTotal === null ? 'Onbekend' : formatEuros(lineTotal)}</span>
               </summary>
 
               <div className="line-edit-fields">
@@ -55,32 +79,48 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                     className="field text-ink"
                   />
                 </label>
-                <label className="label flex flex-col gap-1">
-                  Aantal
+                <label className="label line-field-quantity flex flex-col gap-1">
+                  Aantal {lineKind === 'simple' && <span className="font-medium text-muted">— eenvoudige lijn</span>}
                   <input
                     aria-label={`Aantal voor ${item.description}`}
                     type="number"
                     step="any"
-                    value={item.quantity}
-                    disabled={readOnly}
-                    onChange={(e) => patch(item.id, { quantity: Number(e.target.value) })}
+                    value={item.quantity ?? ''}
+                    placeholder="Optioneel"
+                    disabled={readOnly || lineKind === 'simple'}
+                    onChange={(e) => patch(item.id, { quantity: e.target.value === '' ? null : Number(e.target.value) })}
                     className="field nums text-ink"
                   />
                 </label>
 
-                <label className="label flex flex-col gap-1">
+                <label className="label line-field-kind flex flex-col gap-1">
+                  Regels
+                  <select
+                    aria-label={`Regeltype voor ${item.description}`}
+                    value={lineKind}
+                    disabled={readOnly}
+                    onChange={(e) => patch(item.id, { line_kind: e.target.value as 'simple' | 'detailed', ...(e.target.value === 'simple' ? { quantity: null, unit: null } : {}) })}
+                    className="field text-ink"
+                  >
+                    <option value="simple">Eenvoudige lijn</option>
+                    <option value="detailed">Aantal en eenheid</option>
+                  </select>
+                </label>
+
+                <label className="label line-field-unit flex flex-col gap-1">
                   Eenheid
                   <input
                     aria-label={`Eenheid voor ${item.description}`}
-                    value={item.unit}
-                    disabled={readOnly}
-                    onChange={(e) => patch(item.id, { unit: e.target.value })}
+                    value={item.unit ?? ''}
+                    placeholder="Optioneel"
+                    disabled={readOnly || lineKind === 'simple'}
+                    onChange={(e) => patch(item.id, { unit: e.target.value || null })}
                     className="field text-ink"
                   />
                 </label>
 
-                <label className="label flex flex-col gap-1">
-                  Prijs per eenheid (€)
+                <label className="label line-field-price flex flex-col gap-1">
+                  {lineKind === 'simple' ? 'Totaalprijs (€)' : 'Prijs per eenheid (€)'}
                   <input
                     aria-label={`Prijs voor ${item.description}`}
                     type="number"
@@ -93,10 +133,24 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                           e.target.value === '' ? null : Math.round(Number(e.target.value) * 100),
                       })
                     }
-                    className="field nums text-ink"
+                    className={`field nums text-ink ${unpriced ? 'needs-attention' : ''}`}
                   />
                 </label>
 
+                <label className="label flex flex-col gap-1">
+                  Soort werk
+                  <select
+                    aria-label={`Soort werk voor ${item.description}`}
+                    value={item.classification ?? 'unclassified'}
+                    disabled={readOnly}
+                    onChange={(e) => patch(item.id, { classification: e.target.value as LineClassification })}
+                    className="field text-ink"
+                  >
+                    <option value="material">Materiaal</option>
+                    <option value="labor_service">Arbeid of dienst</option>
+                    <option value="unclassified">Nakijken</option>
+                  </select>
+                </label>
                 <label className="label flex flex-col gap-1">
                   Btw
                   <select
@@ -129,8 +183,25 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
                 </label>
                 {incomplete && (
                   <p className="alert alert-warning col-span-full">
-                    Vul prijs en btw-tarief aan voordat je de offerte afwerkt.
+                    Kies een btw-tarief voor deze geprijsde offertelijn.
                   </p>
+                )}
+                {unpriced && (
+                  <p className="alert alert-warning col-span-full">
+                    Voeg de jobprijs toe of controleer de voorgestelde prijs. Een lege prijs blijft onbekend en wordt niet als €0 gerekend.
+                  </p>
+                )}
+                {!readOnly && (
+                  <div className="line-item-actions col-span-full">
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={removingId !== null}
+                      onClick={() => void remove(item)}
+                    >
+                      {removingId === item.id ? 'Verwijderen…' : 'Item verwijderen'}
+                    </button>
+                  </div>
                 )}
               </div>
             </details>
@@ -138,19 +209,23 @@ export default function LineItemsEditor({ items, onChange, readOnly }: Props) {
         })}
       </div>
 
+      {removeError && <p role="alert" className="alert alert-critical">{removeError}</p>}
+
       <div className="totals-card">
-        {totals.vatGroups.map((group) => (
+        {pricing.vatGroups.map((group) => (
           <div key={group.vatRate} data-testid={`vat-group-${group.vatRate}`}>
             <div className="totals-row"><span>{group.vatRate === 0 ? 'Werk met verlegging' : `Werk aan ${group.vatRate === 0.06 ? '6%' : '21%'} btw`}</span><span>{formatEuros(group.subtotalCents)}</span></div>
             <div className="totals-row"><span>{group.vatRate === 0 ? 'Btw verlegd' : `Btw ${group.vatRate === 0.06 ? '6%' : '21%'}`}</span><span>{formatEuros(group.vatAmountCents)}</span></div>
           </div>
         ))}
         <div className="totals-grand">
-          <strong>Totaal incl. btw</strong>
+          <strong>{pricing.state === 'fully_priced' ? 'Totaal incl. btw' : pricing.state === 'partially_priced' ? 'Totaal gekende werken' : 'Totaal'}</strong>
           <strong data-testid="grand-total">
-            {formatEuros(totals.grandTotalCents)}
+            {pricing.state === 'unpriced' ? 'Prijs nog te bepalen' : formatEuros(pricing.knownTotalCents)}
           </strong>
         </div>
+        {pricing.state === 'partially_priced' && <p className="mt-2 text-sm text-muted">Het bedrag hierboven is enkel het gekende bedrag; overige werken hebben nog geen prijs.</p>}
+        {pricing.state === 'unpriced' && <p className="mt-2 text-sm text-muted">De prijs voor deze werken wordt later bepaald.</p>}
       </div>
     </div>
   );

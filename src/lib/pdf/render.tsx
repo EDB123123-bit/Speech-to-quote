@@ -7,6 +7,7 @@ export async function renderQuotePdf(args: {
   contractor: Contractor;
   quote: Quote;
   lineItems: QuoteLineItem[];
+  originalQuoteNumber?: string | null;
 }): Promise<Buffer> {
   const model = buildQuoteViewModel(args);
   return renderToBuffer(<QuoteDocument model={model} />);

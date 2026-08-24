@@ -56,7 +56,7 @@ export default function CustomersList({ customers }: { customers: CustomerListIt
                   {customer.draftCount > 0 ? `${customer.draftCount} in concept` : 'Alles afgewerkt'}
                 </span>
                 <div>
-                  <p className="quote-amount">{formatEuros(customer.totalCents)}</p>
+                  <p className="quote-amount">{customer.totalCents === null ? 'Onbekend' : formatEuros(customer.totalCents)}</p>
                   <p className="quote-status mobile-only">
                     {customer.quoteCount} {customer.quoteCount === 1 ? 'offerte' : 'offertes'}
                   </p>

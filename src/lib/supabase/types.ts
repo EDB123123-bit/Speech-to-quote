@@ -7,10 +7,18 @@ export function isVatRate(value: unknown): value is VatRate {
   return VAT_RATES.includes(value as VatRate);
 }
 
+/** Legacy database line type retained for historical catalogue-linked rows. */
 export type LineType = 'materials' | 'labor' | 'combined';
+export type LineClassification = 'material' | 'labor_service' | 'unclassified';
+export type QuoteLineKind = 'simple' | 'detailed';
+export type QuotePriceSource = 'explicit' | 'historical_suggestion' | 'manual' | 'unknown';
 export type QuoteVatRate = InvoiceVatRate;
 export type QuoteVatCategory = 'S' | 'AE';
-export type QuoteStatus = 'draft' | 'final';
+export type QuoteStatus = 'draft' | 'final' | 'sent' | 'accepted';
+export type QuoteKind = 'standard' | 'meerwerk';
+export type QuoteTaskStatus = 'todo' | 'done';
+export type MaterialRequirementStatus = 'to_order' | 'ordered';
+export type SupplierOrderStatus = 'draft' | 'sent';
 export type ClarificationStatus = 'pending' | 'resolved' | 'dismissed';
 export type PipelineStep =
   | 'upload'
@@ -54,12 +62,15 @@ export type MailboxConnection = {
   status: MailboxStatus;
   connected_at: string;
   updated_at: string;
+  is_default?: boolean;
+  oauth_scope?: string | null;
+  gmail_read_enabled?: boolean;
 };
 
-export type MailboxSummary = Pick<
-  MailboxConnection,
-  'provider' | 'email_address' | 'status' | 'connected_at'
->;
+export type MailboxSummary = Pick<MailboxConnection, 'provider' | 'email_address' | 'status' | 'connected_at'> & {
+  is_default?: boolean;
+  gmail_read_enabled?: boolean;
+};
 
 export type Contractor = {
   id: string;
@@ -68,7 +79,6 @@ export type Contractor = {
   vat_number: string | null;
   phone: string | null;
   legal_form?: string | null;
-  rpr?: string | null;
   registration_number?: string | null;
   street?: string | null;
   postal_code?: string | null;
@@ -108,9 +118,12 @@ export type PipelineStage = {
 export type Quote = {
   id: string;
   contractor_id: string;
+  customer_id?: string | null;
   transcript: string | null;
   status: QuoteStatus;
-  source?: 'voice' | 'pdf_import';
+  quote_kind?: QuoteKind;
+  parent_quote_id?: string | null;
+  source?: 'voice' | 'manual' | 'pdf_import' | 'gmail';
   quote_number?: string;
   issue_date?: string;
   valid_until?: string | null;
@@ -123,7 +136,109 @@ export type Quote = {
   audio_deleted_at: string | null;
   pdf_path: string | null;
   pipeline_stage_id: string | null;
+  finalized_at?: string | null;
+  sent_at?: string | null;
+  accepted_at?: string | null;
   created_at: string;
+};
+
+export type Customer = {
+  id: string;
+  contractor_id: string;
+  name: string;
+  normalized_name: string;
+  address: string | null;
+  email: string | null;
+  phone: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Supplier = {
+  id: string;
+  contractor_id: string;
+  company_name: string;
+  contact_person: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  vat_number: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MaterialRequirement = {
+  id: string;
+  contractor_id: string;
+  quote_id: string;
+  source_quote_line_item_id: string;
+  material_description: string;
+  quoted_quantity: number | null;
+  order_quantity: number | null;
+  unit: string | null;
+  supplier_id: string | null;
+  status: MaterialRequirementStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SupplierOrder = {
+  id: string;
+  contractor_id: string;
+  quote_id: string;
+  supplier_id: string;
+  order_number: string;
+  status: SupplierOrderStatus;
+  delivery_address: string | null;
+  notes: string | null;
+  email_subject: string | null;
+  email_body: string | null;
+  pdf_path: string | null;
+  pdf_sha256: string | null;
+  pdf_version: number;
+  provider_message_id: string | null;
+  sent_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SupplierOrderLine = {
+  id: string;
+  supplier_order_id: string;
+  material_requirement_id: string | null;
+  description: string;
+  quantity: number;
+  unit: string | null;
+  purchase_unit_price_cents: number | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ContractorNotification = {
+  id: string;
+  contractor_id: string;
+  quote_id: string | null;
+  notification_type: 'quote_accepted';
+  title: string;
+  body: string;
+  href: string;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type QuoteTask = {
+  id: string;
+  contractor_id: string;
+  quote_id: string;
+  title: string;
+  status: QuoteTaskStatus;
+  due_date: string | null;
+  activated_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type QuoteLineItem = {
@@ -132,13 +247,16 @@ export type QuoteLineItem = {
   catalog_item_id: string | null;
   description: string;
   source_notes?: string | null;
-  quantity: number;
-  unit: string;
+  quantity: number | null;
+  unit: string | null;
   unit_code?: string | null;
   unit_price_cents: number | null;
   vat_rate: QuoteVatRate | null;
   vat_category?: QuoteVatCategory;
   line_type: LineType;
+  classification?: LineClassification | null;
+  line_kind?: QuoteLineKind;
+  price_source?: QuotePriceSource;
   sort_order: number;
   created_at: string;
 };
@@ -206,6 +324,42 @@ export type QuoteImportDocument = {
   provider_result_status: 'succeeded' | 'errored' | 'canceled' | 'expired' | null;
   error_code: string | null;
   error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GmailQuoteImport = {
+  id: string;
+  contractor_id: string;
+  mailbox_connection_id: string;
+  gmail_message_id: string;
+  gmail_thread_id: string | null;
+  sender: string;
+  subject: string;
+  received_at: string;
+  body_hash: string;
+  body_text: string;
+  quote_id: string | null;
+  status: 'imported' | 'failed';
+  imported_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type QuoteAttachmentProcessingStatus = 'pending' | 'processing' | 'processed' | 'unsupported' | 'failed';
+
+export type QuoteAttachment = {
+  id: string;
+  contractor_id: string;
+  quote_id: string | null;
+  gmail_import_id: string | null;
+  filename: string;
+  mime_type: string;
+  byte_size: number;
+  sha256: string;
+  storage_path: string;
+  processing_status: QuoteAttachmentProcessingStatus;
+  processing_error: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -292,6 +446,8 @@ export type Invoice = {
 export type InvoiceLineItem = {
   id: string;
   invoice_id: string;
+  source_quote_id: string | null;
+  source_quote_line_item_id: string | null;
   description: string;
   quantity: number;
   unit: string;
@@ -301,6 +457,14 @@ export type InvoiceLineItem = {
   vat_category: InvoiceVatCategory;
   line_total_cents: number;
   sort_order: number;
+  created_at: string;
+};
+
+export type InvoiceQuoteSource = {
+  id: string;
+  invoice_id: string;
+  contractor_id: string;
+  quote_id: string;
   created_at: string;
 };
 

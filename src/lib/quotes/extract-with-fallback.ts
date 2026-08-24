@@ -1,6 +1,5 @@
 import type { ExtractionResult } from '@/lib/ai/schemas';
 import { reconcileExtraction } from '@/lib/quotes/reconcile';
-import type { CatalogItem } from '@/lib/supabase/types';
 
 export type ExtractionOutcome = {
   extraction: ExtractionResult;
@@ -8,26 +7,20 @@ export type ExtractionOutcome = {
   error?: unknown;
 };
 
-/**
- * The catalog is structured data owned by the contractor, so it is also a
- * safe deterministic fallback when the model is unavailable or malformed.
- * This keeps obvious mentions such as "20 m² dekpannen" from becoming an
- * empty quote while still surfacing the provider failure in observability.
- */
+/** Extraction fallback that never reads or applies the contractor catalogue. */
 export async function extractWithCatalogFallback(args: {
   transcript: string;
-  catalog: CatalogItem[];
-  extract: (transcript: string, catalog: CatalogItem[]) => Promise<ExtractionResult>;
+  extract: (transcript: string) => Promise<ExtractionResult>;
 }): Promise<ExtractionOutcome> {
   try {
-    const modelResult = await args.extract(args.transcript, args.catalog);
+    const modelResult = await args.extract(args.transcript);
     return {
-      extraction: reconcileExtraction(args.transcript, modelResult, args.catalog),
+      extraction: reconcileExtraction(args.transcript, modelResult),
       usedFallback: false,
     };
   } catch (error) {
     return {
-      extraction: reconcileExtraction(args.transcript, { tasks: [], clarifications: [] }, args.catalog),
+      extraction: reconcileExtraction(args.transcript, { tasks: [], clarifications: [] }),
       usedFallback: true,
       error,
     };

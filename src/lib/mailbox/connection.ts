@@ -12,8 +12,9 @@ export async function getMailboxSummary(userId: string): Promise<MailboxSummary 
 
   const { data, error } = await createAdminSupabase()
     .from('mailbox_connections')
-    .select('provider,email_address,status,connected_at')
+    .select('provider,email_address,status,connected_at,is_default,gmail_read_enabled')
     .eq('user_id', userId)
+    .eq('is_default', true)
     .maybeSingle();
 
   if (error) throw new Error(`Mailboxstatus ophalen mislukt: ${error.message}`);
@@ -27,19 +28,31 @@ export async function getMailboxConnection(userId: string): Promise<MailboxConne
     .from('mailbox_connections')
     .select('*')
     .eq('user_id', userId)
+    .eq('is_default', true)
     .maybeSingle();
 
   if (error) throw new Error(`Mailbox ophalen mislukt: ${error.message}`);
   return data as MailboxConnection | null;
 }
 
-export async function disconnectMailboxConnection(userId: string): Promise<void> {
+export async function getMailboxConnectionForProvider(userId: string, provider: MailboxConnection['provider']): Promise<MailboxConnection | null> {
+  if (!hasAdminSupabaseConfig()) throw new SupabaseAdminConfigError();
+  const { data, error } = await createAdminSupabase()
+    .from('mailbox_connections')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('provider', provider)
+    .maybeSingle();
+  if (error) throw new Error(`Mailbox ophalen mislukt: ${error.message}`);
+  return data as MailboxConnection | null;
+}
+
+export async function disconnectMailboxConnection(userId: string, provider?: MailboxConnection['provider']): Promise<void> {
   if (!hasAdminSupabaseConfig()) throw new SupabaseAdminConfigError();
 
-  const { error } = await createAdminSupabase()
-    .from('mailbox_connections')
-    .delete()
-    .eq('user_id', userId);
+  let query = createAdminSupabase().from('mailbox_connections').delete().eq('user_id', userId);
+  if (provider) query = query.eq('provider', provider);
+  const { error } = await query;
 
   if (error) throw new Error(`Mailbox loskoppelen mislukt: ${error.message}`);
 }

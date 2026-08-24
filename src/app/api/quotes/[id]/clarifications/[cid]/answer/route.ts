@@ -5,7 +5,8 @@ import { processClarificationAnswer } from '@/lib/ai/clarify';
 import { expandTasksToLineItems } from '@/lib/quotes/expand';
 import { nextClarificationState } from '@/lib/clarifications/retry';
 import { logPipelineEvent } from '@/lib/logging/pipeline-events';
-import type { CatalogItem, QuoteLineItem } from '@/lib/supabase/types';
+import { applyHistoricalSuggestions, loadHistoricalPriceCandidates } from '@/lib/quotes/historical-suggestions-server';
+import type { QuoteLineItem } from '@/lib/supabase/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -35,18 +36,17 @@ export async function POST(
     return NextResponse.json({ error: 'Geen audio ontvangen' }, { status: 400 });
   }
 
-  const [{ data: clarification }, { data: quote }, { data: catalog }, { data: lineItems }] =
+  const [{ data: clarification }, { data: quote }, { data: lineItems }] =
     await Promise.all([
       supabase.from('quote_clarifications').select('*').eq('id', cid).eq('quote_id', id).single(),
       supabase.from('quotes').select('transcript,status').eq('id', id).single(),
-      supabase.from('catalog_items').select('*'),
       supabase.from('quote_line_items').select('*').eq('quote_id', id),
     ]);
 
   if (!clarification || !quote) {
     return NextResponse.json({ error: 'Vraag niet gevonden' }, { status: 404 });
   }
-  if (quote.status === 'final') {
+  if (quote.status !== 'draft') {
     return NextResponse.json({ error: 'Deze offerte is al afgewerkt' }, { status: 409 });
   }
 
@@ -57,7 +57,6 @@ export async function POST(
       originalTranscript: quote.transcript ?? '',
       question: clarification.question_nl,
       answerTranscript,
-      catalog: (catalog ?? []) as CatalogItem[],
       currentLineItems: (lineItems ?? []) as QuoteLineItem[],
     });
 
@@ -68,18 +67,22 @@ export async function POST(
 
     // Apply any work the answer introduced.
     if (outcome.newTasks.length > 0) {
-      const rows = expandTasksToLineItems(outcome.newTasks, (catalog ?? []) as CatalogItem[]);
+      const rows = applyHistoricalSuggestions(
+        expandTasksToLineItems(outcome.newTasks),
+        await loadHistoricalPriceCandidates(supabase, contractorId, id),
+      );
       // Offset past the initial extraction's sort_order range so clarification
       // follow-up lines never collide with the quote's original line items.
       const { error: insertError } = await supabase
         .from('quote_line_items')
-        .insert(rows.map((row) => ({ ...row, quote_id: id, sort_order: 900 + row.sort_order })));
+        .insert(rows.map((row) => ({ ...row, quote_id: id, sort_order: 900 + (row.sort_order ?? 0) })));
       if (insertError) throw new Error(`Opslaan van nieuwe offertelijnen mislukt: ${insertError.message}`);
     }
     for (const update of outcome.updatedLineItems) {
       const patch: Record<string, unknown> = {};
       if (update.quantity !== undefined) patch.quantity = update.quantity;
       if (update.unitPriceCents !== undefined) patch.unit_price_cents = update.unitPriceCents;
+      if (update.unitPriceCents !== undefined) patch.price_source = update.unitPriceCents === null ? 'unknown' : 'manual';
       if (Object.keys(patch).length > 0) {
         const { error: updateError } = await supabase
           .from('quote_line_items')

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { getAnthropic, extractionModel } from '@/lib/ai/anthropic-client';
 import { ExtractedTaskSchema } from '@/lib/ai/schemas';
 import { firstTextBlock, parseJsonObject } from '@/lib/ai/response';
-import type { CatalogItem, QuoteLineItem } from '@/lib/supabase/types';
+import type { QuoteLineItem } from '@/lib/supabase/types';
 
 export class ClarificationError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -18,7 +18,7 @@ export const ClarificationAnswerSchema = z.object({
   updatedLineItems: z.array(
     z.object({
       id: z.string(),
-      quantity: z.number().positive().optional(),
+      quantity: z.number().positive().nullable().optional(),
       unitPriceCents: z.number().int().nonnegative().nullable().optional(),
     }),
   ),
@@ -30,12 +30,8 @@ export function buildClarificationPrompt(args: {
   originalTranscript: string;
   question: string;
   answerTranscript: string;
-  catalog: CatalogItem[];
   currentLineItems: Pick<QuoteLineItem, 'id' | 'description' | 'quantity' | 'unit'>[];
 }): string {
-  const catalogLines = args.catalog
-    .map((item) => `- id: ${item.id} | name: ${item.name} | unit: ${item.unit}`)
-    .join('\n');
   const lineItemLines = args.currentLineItems
     .map((item) => `- id: ${item.id} | ${item.description} | ${item.quantity} ${item.unit}`)
     .join('\n');
@@ -55,9 +51,6 @@ Their spoken answer (Dutch):
 ${args.answerTranscript}
 """
 
-Catalog:
-${catalogLines || '(empty)'}
-
 Current line items:
 ${lineItemLines || '(none)'}
 
@@ -66,8 +59,9 @@ Return ONLY a JSON object with this exact shape:
   "resolved": <true if the answer addresses the question, false otherwise>,
   "rephrasedQuestionNl": "<if not resolved, a shorter/clearer Dutch rephrasing; otherwise null>",
   "newTasks": [
-    { "catalogItemId": "<catalog id or null>", "description": "<Dutch>",
-      "quantity": <positive number>, "unit": "<unit>" }
+    { "description": "<Dutch>", "quantity": <number or null>, "unit": "<unit or null>",
+      "unitPriceCents": <explicit selling price or null>, "priceExplicit": <boolean>,
+      "classification": "material" or "labor_service" }
   ],
   "updatedLineItems": [
     { "id": "<existing line item id>", "quantity": <number>, "unitPriceCents": <integer or null> }
@@ -75,7 +69,7 @@ Return ONLY a JSON object with this exact shape:
 }
 
 Rules:
-- Never invent prices. Only reference catalog ids listed above.
+- Never invent prices. Missing prices remain null and are valid.
 - An answer like "euh", "weet ik niet", or silence is NOT resolved.
 - If the answer resolves the question but adds no work, return empty arrays.
 - Only include a line item in updatedLineItems if the answer actually changes it.`;
@@ -85,7 +79,6 @@ export async function processClarificationAnswer(args: {
   originalTranscript: string;
   question: string;
   answerTranscript: string;
-  catalog: CatalogItem[];
   currentLineItems: Pick<QuoteLineItem, 'id' | 'description' | 'quantity' | 'unit'>[];
 }): Promise<ClarificationAnswer> {
   let response;

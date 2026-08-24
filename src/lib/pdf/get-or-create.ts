@@ -26,23 +26,38 @@ export async function getOrCreateQuotePdf(args: {
     .select('*')
     .eq('quote_id', args.quote.id);
   if (lineItemsError) throw new Error(lineItemsError.message);
+  let originalQuoteNumber: string | null = null;
+  if (args.quote.parent_quote_id) {
+    const { data: parent } = await args.supabase.from('quotes').select('quote_number').eq('id', args.quote.parent_quote_id).maybeSingle();
+    originalQuoteNumber = parent?.quote_number ?? null;
+  }
 
   const pdf = await renderQuotePdf({
     contractor: args.contractor,
     quote: args.quote,
     lineItems: (lineItems ?? []) as QuoteLineItem[],
+    originalQuoteNumber,
   });
   const path = `${args.contractor.id}/${args.quote.id}.pdf`;
 
   const { error: uploadError } = await args.supabase.storage
     .from('quote-pdfs')
-    .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
-  if (uploadError) throw new Error(uploadError.message);
+    .upload(path, pdf, { contentType: 'application/pdf', upsert: false });
+  let storedPdf = new Uint8Array(pdf);
+  if (uploadError) {
+    // A previous finalization may have stored the immutable object before its
+    // DB path was recorded. Reuse it; never overwrite a finalized artifact.
+    const existing = await args.supabase.storage.from('quote-pdfs').download(path);
+    if (existing.error || !existing.data) throw new Error(uploadError.message);
+    storedPdf = new Uint8Array(await existing.data.arrayBuffer());
+  }
 
   const { error: updateError } = await args.supabase
-    .from('quotes')
-    .update({ pdf_path: path })
-    .eq('id', args.quote.id);
+    .rpc('set_quote_pdf_path', {
+      p_quote_id: args.quote.id,
+      p_contractor_id: args.contractor.id,
+      p_pdf_path: path,
+    });
   if (updateError) throw new Error(updateError.message);
 
   await logPipelineEvent({
@@ -53,5 +68,5 @@ export async function getOrCreateQuotePdf(args: {
     detail: { path, regenerated: true },
   });
 
-  return { pdf: new Uint8Array(pdf), path };
+  return { pdf: storedPdf, path };
 }

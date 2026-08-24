@@ -5,6 +5,7 @@ import Link from 'next/link';
 import DeleteQuoteButton from '@/components/DeleteQuoteButton';
 import Icon from '@/components/ui/Icon';
 import { formatEuros } from '@/lib/money/totals';
+import type { QuoteKind, QuoteStatus } from '@/lib/supabase/types';
 
 export type QuoteListItem = {
   id: string;
@@ -13,8 +14,10 @@ export type QuoteListItem = {
   createdAt: string;
   issueDate: string;
   quoteNumber: string;
-  status: 'draft' | 'final';
-  totalCents: number;
+  status: QuoteStatus;
+  quoteKind?: QuoteKind;
+  totalCents: number | null;
+  pricingState?: 'fully_priced' | 'partially_priced' | 'unpriced';
   openQuestions: number;
 };
 
@@ -52,19 +55,23 @@ export default function QuotesList({ quotes, showSearch = true }: { quotes: Quot
           </div>
           <ul className="quote-list">
             {filtered.map((quote) => {
+              const status = statusPresentation(quote.status);
               const formattedDate = new Date(`${quote.issueDate}T00:00:00`).toLocaleDateString('nl-BE', {
                 day: '2-digit',
                 month: '2-digit',
               });
               return (
                 <li key={quote.id} className="quote-card">
-                  <div className="delete-compact">
-                    <DeleteQuoteButton quoteId={quote.id} compact />
-                  </div>
+                  {quote.status !== 'accepted' && (
+                    <div className="delete-compact">
+                      <DeleteQuoteButton quoteId={quote.id} compact />
+                    </div>
+                  )}
                   <Link href={`/offertes/${quote.id}`} className="quote-card-link">
                     <div>
                       <p className="quote-name">{quote.customerName}</p>
                       <p className="text-xs text-muted">{quote.quoteNumber}</p>
+                      {quote.quoteKind === 'meerwerk' && <span className="status-pill is-warning">Meerwerk</span>}
                       <p className="quote-meta mobile-only">
                         {[quote.place, new Date(`${quote.issueDate}T00:00:00`).toLocaleDateString('nl-BE')].filter(Boolean).join(' · ')}
                       </p>
@@ -77,14 +84,14 @@ export default function QuotesList({ quotes, showSearch = true }: { quotes: Quot
                     </div>
                     <span className="desktop-only quote-meta">{quote.place || '—'}</span>
                     <span className="desktop-only quote-meta nums">{formattedDate}</span>
-                    <span className={`desktop-only status-pill ${quote.openQuestions > 0 ? 'is-warning' : quote.status === 'final' ? 'is-success' : 'is-neutral'}`}>
+                    <span className={`desktop-only status-pill ${quote.openQuestions > 0 ? 'is-warning' : status.className}`}>
                       {quote.openQuestions > 0
                         ? `${quote.openQuestions} ${quote.openQuestions === 1 ? 'vraag' : 'vragen'} open`
-                        : quote.status === 'final' ? 'Afgewerkt' : 'Concept'}
+                        : quote.quoteKind === 'meerwerk' ? `Meerwerk · ${status.label}` : status.label}
                     </span>
                     <div>
-                      <p className="quote-amount">{formatEuros(quote.totalCents)}</p>
-                      <p className="quote-status mobile-only">{quote.status === 'final' ? 'Afgewerkt' : 'Concept'}</p>
+                      <p className="quote-amount">{quote.totalCents === null ? 'Onbekend' : quote.pricingState === 'partially_priced' ? `Gekend: ${formatEuros(quote.totalCents)}` : formatEuros(quote.totalCents)}</p>
+                      <p className="quote-status mobile-only">{status.label}</p>
                     </div>
                     <Icon name="chevron-right" size={20} />
                   </Link>
@@ -96,4 +103,11 @@ export default function QuotesList({ quotes, showSearch = true }: { quotes: Quot
       )}
     </>
   );
+}
+
+function statusPresentation(status: QuoteStatus): { label: string; className: string } {
+  if (status === 'accepted') return { label: 'Aanvaard', className: 'is-success' };
+  if (status === 'sent') return { label: 'Verstuurd', className: 'is-warning' };
+  if (status === 'final') return { label: 'Afgewerkt', className: 'is-final' };
+  return { label: 'Concept', className: 'is-neutral' };
 }

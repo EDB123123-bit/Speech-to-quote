@@ -47,7 +47,7 @@ export default function QuoteCard({ quote, column, stages, onMove, busy }: Props
         </button>
       </div>
 
-      <p className="nums text-right text-lg font-extrabold">{formatEuros(quote.grandTotalCents)}</p>
+      <p className="nums text-right text-lg font-extrabold">{quote.grandTotalCents === null ? 'Onbekend' : quote.pricingState === 'partially_priced' ? `Gekend: ${formatEuros(quote.grandTotalCents)}` : formatEuros(quote.grandTotalCents)}</p>
 
       {targets.length > 0 && (
         <details className="relative">

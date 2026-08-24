@@ -46,6 +46,26 @@ describe('QuoteEditor', () => {
     expect(screen.getByText(/tachtig vierkante meter dakpannen/)).toBeInTheDocument();
   });
 
+  it('does not show the voice transcript for a Gmail import', () => {
+    render(<QuoteEditor quote={{ ...quote, source: 'gmail' }} initialLineItems={[line()]} initialClarifications={[]} />);
+    expect(screen.queryByText(/tachtig vierkante meter dakpannen/)).not.toBeInTheDocument();
+  });
+
+  it('does not show the voice transcript when Gmail provenance is supplied separately', () => {
+    render(<QuoteEditor quote={quote} isGmailImport initialLineItems={[line()]} initialClarifications={[]} />);
+    expect(screen.queryByText(/tachtig vierkante meter dakpannen/)).not.toBeInTheDocument();
+  });
+
+  it('does not show voice clarification or retry UI for a Gmail quote', () => {
+    render(<QuoteEditor quote={{ ...quote, transcript: 'mailinhoud' }} isGmailImport initialLineItems={[]} initialClarifications={[{
+      id: 'c1', quote_id: 'quote-1', question_nl: 'Welke prijs moet ik invullen?',
+      status: 'pending', retry_count: 0, created_at: '2026-08-06T00:00:00Z',
+    }]} />);
+    expect(screen.queryByTestId('clarifications')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /prijslijst opnieuw toepassen/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /e-mail opnieuw verwerken/i })).toBeInTheDocument();
+  });
+
   it('renders the line items editor', () => {
     render(<QuoteEditor quote={quote} initialLineItems={[line()]} initialClarifications={[]} />);
     expect(screen.getByDisplayValue('Dakpannen leggen – materiaal')).toBeInTheDocument();
@@ -62,7 +82,9 @@ describe('QuoteEditor', () => {
         }]}
       />,
     );
-    expect(screen.getByRole('button', { name: /offerte afwerken/i })).toBeDisabled();
+    const button = screen.getByRole('button', { name: /offerte afwerken/i });
+    expect(button).toBeDisabled();
+    expect(button.parentElement).toHaveAttribute('title', expect.stringContaining('openstaande vraag'));
   });
 
   it('enables finalizing when everything is complete', () => {
@@ -74,7 +96,9 @@ describe('QuoteEditor', () => {
     render(
       <QuoteEditor quote={quote} initialLineItems={[line({ vat_rate: null })]} initialClarifications={[]} />,
     );
-    expect(screen.getByRole('button', { name: /offerte afwerken/i })).toBeDisabled();
+    const button = screen.getByRole('button', { name: /offerte afwerken/i });
+    expect(button).toBeDisabled();
+    expect(button.parentElement).toHaveAttribute('title', expect.stringContaining('btw'));
   });
 
   it('shows the server blockers when finalizing is rejected', async () => {
@@ -146,14 +170,15 @@ describe('QuoteEditor', () => {
     );
   });
 
-  it('offers to reapply the catalog when extraction produced an empty draft', async () => {
+  it('offers to reprocess the recording without referring to a catalogue', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({ ok: true, lineItemCount: 2 }),
     });
 
     render(<QuoteEditor quote={quote} initialLineItems={[]} initialClarifications={[]} />);
-    await userEvent.click(screen.getByRole('button', { name: /prijslijst opnieuw toepassen/i }));
+    expect(screen.queryByText(/prijslijst/iu)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /opname opnieuw verwerken/i }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/quotes/quote-1/retry', { method: 'POST' }));
   });

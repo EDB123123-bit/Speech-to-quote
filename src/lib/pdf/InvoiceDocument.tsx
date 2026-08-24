@@ -24,7 +24,6 @@ export default function InvoiceDocument({ model }: { model: Parameters<typeof bu
       <Text style={styles.muted}>{view.seller.postalCode} {view.seller.city}</Text>
       {!!view.seller.vatNumber && <Text style={styles.muted}>BTW {view.seller.vatNumber}</Text>}
       {!!view.seller.enterpriseNumber && <Text style={styles.muted}>KBO {view.seller.enterpriseNumber}</Text>}
-      {!!view.seller.rpr && <Text style={styles.muted}>{view.seller.rpr}</Text>}
       {!!view.seller.email && <Text style={styles.muted}>{view.seller.email}</Text>}
       {!!view.seller.phone && <Text style={styles.muted}>Tel. {view.seller.phone}</Text>}
     </View><View>

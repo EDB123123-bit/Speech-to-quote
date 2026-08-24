@@ -8,17 +8,20 @@ import ClarificationPanel from '@/components/ClarificationPanel';
 import CustomerForm from '@/components/CustomerForm';
 import EmailQuoteForm from '@/components/EmailQuoteForm';
 import { checkFinalizeGate } from '@/lib/quotes/finalize-gate';
-import { calculateTotals, formatEuros, toTotalsInput } from '@/lib/money/totals';
+import { formatEuros, summarizePricing } from '@/lib/money/totals';
 import Icon from '@/components/ui/Icon';
 import ShareQuoteButton from '@/components/ShareQuoteButton';
 import QuoteMetadataForm from '@/components/QuoteMetadataForm';
+import QuoteTasksPanel from '@/components/QuoteTasksPanel';
 import { updateLineItem, addLineItem } from '@/app/offertes/[id]/line-item-actions';
-import type { LineType, MailboxSummary, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
+import type { LineType, MailboxSummary, Quote, QuoteClarification, QuoteLineItem, QuoteTask } from '@/lib/supabase/types';
 
 type Props = {
   quote: Quote;
   initialLineItems: QuoteLineItem[];
   initialClarifications: QuoteClarification[];
+  initialTasks?: QuoteTask[];
+  isGmailImport?: boolean;
   mailbox?: MailboxSummary | null;
   companyName?: string;
   invoice?: { id: string; status: string; invoice_number: string | null } | null;
@@ -28,6 +31,8 @@ export default function QuoteEditor({
   quote,
   initialLineItems,
   initialClarifications,
+  initialTasks = [],
+  isGmailImport = false,
   mailbox = null,
   companyName = 'je bedrijf',
   invoice = null,
@@ -43,11 +48,17 @@ export default function QuoteEditor({
   // thinks succeeded must block finalizing rather than fail silently.
   const [saveFailed, setSaveFailed] = useState(false);
 
-  const isFinal = quote.status === 'final';
+  const isFinal = quote.status !== 'draft';
+  const isEmailQuote = isGmailImport || quote.source === 'gmail';
   const blockers = checkFinalizeGate({ quote, lineItems, clarifications: initialClarifications });
-  const totals = calculateTotals(toTotalsInput(lineItems));
+  const pricing = summarizePricing(lineItems);
   const pendingQuestions = initialClarifications.filter((item) => item.status === 'pending').length;
-  const incompleteLines = lineItems.filter((item) => item.unit_price_cents === null || item.vat_rate === null).length;
+  const incompleteLines = lineItems.filter((item) => item.unit_price_cents !== null && item.vat_rate === null).length;
+  const finalizeDisabled = busy || blockers.length > 0 || saveFailed;
+  const finalizeHint = [
+    ...blockers.map((blocker) => blocker.messageNl),
+    ...(saveFailed ? ['Een offertelijn kon niet opgeslagen worden. Controleer je verbinding en probeer opnieuw.'] : []),
+  ].join('\n');
 
   function onLineItemsChange(next: QuoteLineItem[]) {
     setLineItems(next);
@@ -62,7 +73,9 @@ export default function QuoteEditor({
         before.unit !== item.unit ||
         before.unit_price_cents !== item.unit_price_cents ||
         before.vat_rate !== item.vat_rate ||
-        before.vat_category !== item.vat_category;
+        before.vat_category !== item.vat_category ||
+        before.classification !== item.classification ||
+        before.line_kind !== item.line_kind;
 
       if (changed) {
         void updateLineItem(item.id, {
@@ -73,6 +86,8 @@ export default function QuoteEditor({
           unit_price_cents: item.unit_price_cents,
           vat_rate: item.vat_rate,
           vat_category: item.vat_category,
+          classification: item.classification,
+          line_kind: item.line_kind,
         })
           .then(() => setSaveFailed(false))
           .catch(() => setSaveFailed(true));
@@ -138,14 +153,14 @@ export default function QuoteEditor({
   return (
     <div className="quote-workspace">
       <div className="quote-main">
-        {quote.transcript && (
+        {!isEmailQuote && quote.transcript && (
           <details className="card text-sm">
             <summary className="cursor-pointer text-base font-bold">Wat ik gehoord heb</summary>
             <p className="mt-3 leading-relaxed text-ink">{quote.transcript}</p>
           </details>
         )}
 
-        {!isFinal && (
+        {!isEmailQuote && !isFinal && (
           <ClarificationPanel
             quoteId={quote.id}
             clarifications={initialClarifications}
@@ -157,10 +172,10 @@ export default function QuoteEditor({
           <section className="alert alert-warning flex-col items-start gap-3">
             <div>
               <strong>Er zijn nog geen offertelijnen.</strong>
-              <p className="mt-1">Ik kan de opname opnieuw verwerken en de prijslijst toepassen zonder opnieuw op te nemen.</p>
+              <p className="mt-1">{isEmailQuote ? 'Ik kan de e-mail opnieuw verwerken en de aanvraag opnieuw analyseren.' : 'Ik kan de opname opnieuw verwerken zonder opnieuw op te nemen.'}</p>
             </div>
             <button type="button" onClick={() => void retryProcessing()} disabled={retrying} className="btn btn-outline">
-              {retrying ? 'Prijslijst toepassen…' : 'Prijslijst opnieuw toepassen'}
+              {retrying ? (isEmailQuote ? 'E-mail verwerken…' : 'Opname verwerken…') : (isEmailQuote ? 'E-mail opnieuw verwerken' : 'Opname opnieuw verwerken')}
             </button>
           </section>
         )}
@@ -183,6 +198,12 @@ export default function QuoteEditor({
             </div>
           )}
         </section>
+
+        <QuoteTasksPanel
+          quoteId={quote.id}
+          quoteStatus={quote.status}
+          initialTasks={initialTasks}
+        />
       </div>
 
       <aside className="quote-sidebar">
@@ -190,10 +211,10 @@ export default function QuoteEditor({
           <div className="ready-card">
             <span className="ready-icon"><Icon name="check" size={28} /></span>
             <h2>Offerte is klaar</h2>
-            <p>{quote.customer_name ?? 'Klant'} · {formatEuros(totals.grandTotalCents)} incl. btw</p>
+            <p>{quote.customer_name ?? 'Klant'} · {pricing.state === 'fully_priced' ? `${formatEuros(pricing.knownTotalCents)} incl. btw` : pricing.state === 'partially_priced' ? `Gekend bedrag ${formatEuros(pricing.knownTotalCents)}` : 'Prijs nog te bepalen'}</p>
           </div>
         ) : (
-          <><QuoteMetadataForm quote={quote} /><CustomerForm quote={quote} /></>
+          <><QuoteMetadataForm quote={quote} />{quote.quote_kind === 'meerwerk' ? <section className="quote-sidebar-card"><h2 className="section-heading">Klant</h2><p className="font-bold">{quote.customer_name ?? 'Klant'}</p><p className="text-sm text-muted">Klantgegevens zijn overgenomen van de oorspronkelijke offerte.</p></section> : <CustomerForm quote={quote} />}</>
         )}
 
         {saveFailed && (
@@ -217,14 +238,14 @@ export default function QuoteEditor({
               <a href={`/api/quotes/${quote.id}/pdf`} className="btn btn-outline w-full">
                 <Icon name="download" size={21} /> Pdf downloaden
               </a>
-              {invoice ? (
+              {quote.status === 'accepted' && (invoice ? (
                 <Link href={`/facturen/${invoice.id}`} className="btn btn-accent w-full">{invoice.status === 'draft' ? 'Factuurconcept verder nakijken' : `Factuur ${invoice.invoice_number ?? ''} bekijken`}</Link>
               ) : (
                 <Link href={`/facturen/nieuw?quote=${quote.id}`} className="btn btn-accent w-full">Factuur maken</Link>
-              )}
+              ))}
               </div>
             </section>
-            <EmailQuoteForm quote={quote} companyName={companyName} mailbox={mailbox} />
+            {quote.status !== 'accepted' && <EmailQuoteForm quote={quote} companyName={companyName} mailbox={mailbox} />}
           </>
         ) : (
           <div className="sticky-action">
@@ -237,9 +258,11 @@ export default function QuoteEditor({
                 ].filter(Boolean).join(', ')}.
               </p>
             )}
-            <button type="button" onClick={() => void finalize()} disabled={busy || blockers.length > 0 || saveFailed} className="btn btn-primary w-full">
-              {busy ? 'Bezig…' : `Offerte afwerken · ${formatEuros(totals.grandTotalCents)}`}
-            </button>
+            <span className="finalize-button-wrapper" title={finalizeHint || undefined}>
+              <button type="button" onClick={() => void finalize()} disabled={finalizeDisabled} className="btn btn-primary w-full">
+                {busy ? 'Bezig…' : pricing.state === 'unpriced' ? 'Offerte afwerken · prijs nog te bepalen' : `Offerte afwerken · ${formatEuros(pricing.knownTotalCents)}`}
+              </button>
+            </span>
           </div>
         )}
 

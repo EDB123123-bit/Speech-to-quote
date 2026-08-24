@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import Icon from '@/components/ui/Icon';
 
-export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: boolean }) {
+export default function RecordQuote(props?: { hasCatalogItems?: boolean; parentQuoteId?: string | null }) {
   const router = useRouter();
   const [status, setStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +17,7 @@ export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: bool
 
     const form = new FormData();
     form.append('audio', audio, 'opname.webm');
+    if (props?.parentQuoteId) form.append('parentQuoteId', props.parentQuoteId);
 
     try {
       const response = await fetch('/api/quotes/generate', { method: 'POST', body: form });
@@ -47,13 +48,6 @@ export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: bool
 
   return (
     <div className="flex flex-col gap-5">
-      {!hasCatalogItems && (
-        <p role="alert" className="alert alert-warning">
-          <Icon name="warning" size={21} />
-          <span>Stel eerst je prijslijst in bij Instellingen. Zonder prijzen kan er geen offerte gemaakt worden.</span>
-        </p>
-      )}
-
       {status !== 'uploading' ? (
         <>
           <div className="example-card">
@@ -69,7 +63,6 @@ export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: bool
             <VoiceRecorder
               onRecorded={onRecorded}
               label="Tik om te beginnen"
-              disabled={!hasCatalogItems}
               variant="hero"
             />
           </div>
@@ -81,7 +74,7 @@ export default function RecordQuote({ hasCatalogItems }: { hasCatalogItems: bool
           <div className="processing-panel">
             <div className="processing-step"><span className="step-icon"><Icon name="check" size={19} /></span>Opname bewaard</div>
             <div className="processing-step"><span className="step-icon"><Icon name="check" size={19} /></span>Uitgeschreven wat je zei</div>
-            <div className="processing-step"><span className="step-icon is-loading"><span className="spinner" /></span>Je prijzen erbij zoeken</div>
+            <div className="processing-step"><span className="step-icon is-loading"><span className="spinner" /></span>Je job-specifieke prijzen verwerken</div>
           </div>
           <p className="mt-4 rounded-3xl bg-[var(--paper-strong)] p-5 font-semibold leading-relaxed text-muted">
             Loopt het mis? Je opname blijft staan. Je kan ze opnieuw laten verwerken.

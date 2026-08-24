@@ -1,77 +1,70 @@
-import type { CatalogItem, LineType, VatRate } from '@/lib/supabase/types';
+import type {
+  LineClassification,
+  LineType,
+  QuotePriceSource,
+  QuoteLineKind,
+  VatRate,
+} from '@/lib/supabase/types';
 
 export type ExtractedTask = {
-  catalogItemId: string | null;
+  /** @deprecated accepted only when reading legacy model fixtures; never used for new generation. */
+  catalogItemId?: string | null;
   description: string;
-  quantity: number;
-  unit: string;
+  quantity: number | null;
+  unit: string | null;
+  unitPriceCents?: number | null;
+  priceExplicit?: boolean;
+  classification?: Exclude<LineClassification, 'unclassified'>;
 };
 
 export type NewLineItem = {
-  catalog_item_id: string | null;
+  catalog_item_id: null;
   description: string;
-  quantity: number;
-  unit: string;
-  unit_code?: string | null;
+  quantity: number | null;
+  unit: string | null;
+  unit_code: null;
   unit_price_cents: number | null;
   vat_rate: VatRate | null;
   line_type: LineType;
+  classification: Exclude<LineClassification, 'unclassified'>;
+  line_kind: QuoteLineKind;
+  price_source: QuotePriceSource;
   sort_order: number;
 };
 
-const SUFFIX: Record<LineType, string> = {
-  materials: 'materiaal',
-  labor: 'arbeid',
-  combined: '',
-};
+function legacyLineType(classification: Exclude<LineClassification, 'unclassified'>): LineType {
+  return classification === 'material' ? 'materials' : 'labor';
+}
 
-export function expandTasksToLineItems(
-  tasks: ExtractedTask[],
-  catalog: CatalogItem[],
-): NewLineItem[] {
-  const byId = new Map(catalog.map((item) => [item.id, item]));
-  const rows: NewLineItem[] = [];
+/**
+ * New V1 quotes contain one truthful row per spoken work item. Catalogue rows
+ * are intentionally not consulted here; historical catalogue-linked rows are
+ * preserved by the database and rendered through their legacy line_type.
+ */
+export function expandTasksToLineItems(tasks: ExtractedTask[], _legacyCatalog?: unknown): NewLineItem[] {
+  void _legacyCatalog;
+  return tasks.map((task, index) => {
+    const classification = task.classification ?? 'labor_service';
+    const quantity = task.quantity !== null && task.quantity > 0 ? task.quantity : null;
+    const unit = task.unit?.trim() || null;
+    const lineKind: QuoteLineKind = quantity !== null && unit !== null ? 'detailed' : 'simple';
+    const price = task.priceExplicit === true && task.unitPriceCents !== null && task.unitPriceCents !== undefined && task.unitPriceCents >= 0
+      ? task.unitPriceCents
+      : null;
 
-  for (const task of tasks) {
-    const match = task.catalogItemId ? byId.get(task.catalogItemId) : undefined;
-    // A catalogItemId the model invented is treated as unmatched rather than
-    // trusted — we never price a line we cannot trace to a real catalog row.
-    const baseName = match ? match.name : task.description;
-    const unit = match ? match.unit : task.unit;
-
-    if (match?.pricing_mode === 'combined') {
-      rows.push({
-        catalog_item_id: match.id,
-        description: baseName,
-        quantity: task.quantity,
-        unit,
-        unit_code: match.unit_code ?? null,
-        unit_price_cents: match.combined_price_cents ?? null,
-        vat_rate: match.vat_rate,
-        line_type: 'combined',
-        sort_order: rows.length,
-      });
-      continue;
-    }
-
-    for (const lineType of ['materials', 'labor'] as const) {
-      rows.push({
-        catalog_item_id: match ? match.id : null,
-        description: `${baseName} – ${SUFFIX[lineType]}`,
-        quantity: task.quantity,
-        unit,
-        unit_code: match?.unit_code ?? null,
-        unit_price_cents: match
-          ? lineType === 'materials'
-            ? match.materials_price_cents ?? null
-            : match.labor_price_cents ?? null
-          : null,
-        vat_rate: match ? match.vat_rate : null,
-        line_type: lineType,
-        sort_order: rows.length,
-      });
-    }
-  }
-
-  return rows;
+    return {
+      catalog_item_id: null,
+      description: task.description.trim(),
+      quantity: lineKind === 'simple' ? null : quantity,
+      unit: lineKind === 'simple' ? null : unit,
+      unit_code: null,
+      unit_price_cents: price,
+      vat_rate: null,
+      line_type: legacyLineType(classification),
+      classification,
+      line_kind: lineKind,
+      price_source: price === null ? 'unknown' : 'explicit',
+      sort_order: index,
+    };
+  });
 }

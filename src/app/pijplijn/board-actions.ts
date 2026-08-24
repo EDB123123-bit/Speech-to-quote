@@ -5,6 +5,7 @@ import { requireContractor, UnauthorizedError } from '@/lib/auth/require-contrac
 import { movePipelineStage } from '@/lib/quotes/pipeline-move';
 import { renderQuotePdf } from '@/lib/pdf/render';
 import { logPipelineEvent } from '@/lib/logging/pipeline-events';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 import type { MoveTarget } from '@/lib/quotes/stage-move';
 import type { Contractor, PipelineStage, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
@@ -55,22 +56,40 @@ async function moveQuoteToStageUnsafe(
           return (data ?? []) as QuoteClarification[];
         },
         updateStatusToFinal: async (id) => {
-          const { error } = await supabase
-            .from('quotes').update({ status: 'final' }).eq('id', id).eq('status', 'draft');
+          const { data, error } = await supabase
+            .from('quotes')
+            .update({ status: 'final' })
+            .eq('id', id)
+            .eq('status', 'draft')
+            .select('id')
+            .maybeSingle();
           if (error) throw new Error('Afwerken mislukt. Probeer opnieuw.');
+          if (!data) throw new Error('Afwerken mislukt. Probeer opnieuw.');
         },
         loadContractor: async (id) => {
           const { data } = await supabase.from('contractors').select('*').eq('id', id).single();
           return data as Contractor | null;
         },
+        loadParentQuoteNumber: async (parentId) => {
+          const { data } = await supabase.from('quotes').select('quote_number').eq('id', parentId).maybeSingle();
+          return data?.quote_number ?? null;
+        },
         renderPdf: renderQuotePdf,
         uploadPdf: async (path, pdf) => {
-          const { error } = await supabase.storage
-            .from('quote-pdfs').upload(path, pdf, { contentType: 'application/pdf', upsert: true });
-          if (error) throw new Error(error.message);
+          const admin = createAdminSupabase();
+          const { error } = await admin.storage
+            .from('quote-pdfs').upload(path, pdf, { contentType: 'application/pdf', upsert: false });
+          if (error) {
+            const existing = await admin.storage.from('quote-pdfs').download(path);
+            if (existing.error || !existing.data) throw new Error(error.message);
+          }
         },
         savePdfPath: async (id, path) => {
-          const { error } = await supabase.from('quotes').update({ pdf_path: path }).eq('id', id);
+          const { error } = await createAdminSupabase().rpc('set_quote_pdf_path', {
+            p_quote_id: id,
+            p_contractor_id: contractor.id,
+            p_pdf_path: path,
+          });
           if (error) throw new Error(error.message);
         },
         log: logPipelineEvent,

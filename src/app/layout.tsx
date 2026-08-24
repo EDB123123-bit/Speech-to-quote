@@ -1,14 +1,7 @@
 import type { Metadata } from 'next';
-import { Figtree } from 'next/font/google';
 import AppShell from '@/components/AppShell';
 import OnboardingTour from '@/components/onboarding/OnboardingTour';
 import './globals.css';
-
-const figtree = Figtree({
-  subsets: ['latin'],
-  variable: '--font-figtree',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'Offertes',
@@ -17,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="nl" className={figtree.variable}>
+    <html lang="nl">
       <body>
         <AppShell>{children}</AppShell>
         <OnboardingTour />

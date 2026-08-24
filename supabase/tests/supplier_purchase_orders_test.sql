@@ -1,5 +1,5 @@
 begin;
-select plan(29);
+select plan(31);
 
 select has_table('public', 'supplier_orders', 'supplier orders table exists');
 select has_table('public', 'supplier_order_lines', 'supplier order lines table exists');

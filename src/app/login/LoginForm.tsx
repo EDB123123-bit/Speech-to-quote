@@ -12,6 +12,10 @@ export default function LoginForm() {
   const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [signupComplete, setSignupComplete] = useState<{
+    email: string;
+    requiresEmailConfirmation: boolean;
+  } | null>(null);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -19,7 +23,7 @@ export default function LoginForm() {
     setError(null);
     const supabase = createBrowserSupabase();
 
-    const { error: authError } =
+    const result =
       mode === 'login'
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({
@@ -32,12 +36,58 @@ export default function LoginForm() {
           });
 
     setBusy(false);
-    if (authError) {
+    if (result.error) {
       setError('Aanmelden mislukt. Controleer je e-mailadres en wachtwoord.');
       return;
     }
+
+    if (mode === 'signup') {
+      setSignupComplete({
+        email,
+        requiresEmailConfirmation: !result.data.session,
+      });
+      return;
+    }
+
     router.push('/offertes');
     router.refresh();
+  }
+
+  if (signupComplete) {
+    return (
+      <section className="card flex flex-col gap-4 shadow-[var(--shadow)]" role="status" aria-live="polite">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--success-bg)] text-xl font-bold text-[var(--success)]" aria-hidden="true">
+          ✓
+        </div>
+        <h2 className="text-2xl font-semibold">Account aangemaakt</h2>
+        {signupComplete.requiresEmailConfirmation ? (
+          <p className="text-muted">
+            We hebben een bevestigingslink gestuurd naar <strong>{signupComplete.email}</strong>.
+            Bevestig je e-mailadres via die link en meld je daarna aan.
+          </p>
+        ) : (
+          <p className="text-muted">
+            Je account is aangemaakt en je bent meteen aangemeld. Je kunt nu je eerste offerte maken.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            if (!signupComplete.requiresEmailConfirmation) {
+              router.push('/offertes');
+              router.refresh();
+              return;
+            }
+            setSignupComplete(null);
+            setMode('login');
+            setPassword('');
+          }}
+          className="btn btn-primary"
+        >
+          {signupComplete.requiresEmailConfirmation ? 'Terug naar aanmelden' : 'Naar mijn offertes'}
+        </button>
+      </section>
+    );
   }
 
   return (

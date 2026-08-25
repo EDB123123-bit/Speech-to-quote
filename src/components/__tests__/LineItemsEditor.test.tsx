@@ -4,7 +4,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LineItemsEditor, { toTotalsInput } from '@/components/LineItemsEditor';
+import { removeLineItem } from '@/app/offertes/[id]/line-item-actions';
 import type { QuoteLineItem } from '@/lib/supabase/types';
+
+vi.mock('@/app/offertes/[id]/line-item-actions', () => ({
+  removeLineItem: vi.fn().mockResolvedValue(undefined),
+}));
 
 function item(overrides: Partial<QuoteLineItem> = {}): QuoteLineItem {
   return {
@@ -113,8 +118,42 @@ describe('LineItemsEditor', () => {
     expect(last[0].vat_rate).toBe(0.21);
   });
 
-  it('flags a row that still needs a price or VAT rate', () => {
+  it('shows unknown prices without treating them as zero', () => {
     render(<LineItemsEditor items={[item({ unit_price_cents: null, vat_rate: null })]} onChange={vi.fn()} />);
-    expect(screen.getByText(/vul prijs en btw-tarief aan/i)).toBeInTheDocument();
+    expect(screen.getByText(/prijs toevoegen \/ verifiëren/i)).toBeInTheDocument();
+    expect(screen.getByText('Onbekend')).toBeInTheDocument();
+    expect(screen.getByText(/prijs voor deze werken wordt later bepaald/i)).toBeInTheDocument();
+    expect(screen.getByText(/voeg de jobprijs toe/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/prijs voor/i)).toHaveClass('needs-attention');
+  });
+
+  it('requires VAT only when a selling price exists', () => {
+    render(<LineItemsEditor items={[item({ vat_rate: null })]} onChange={vi.fn()} />);
+    expect(screen.getByText(/btw ontbreekt/i)).toBeInTheDocument();
+    expect(screen.getByText(/kies een btw-tarief/i)).toBeInTheDocument();
+  });
+
+  it('places Regels immediately after Aantal in the field order', () => {
+    render(<LineItemsEditor items={[item()]} onChange={vi.fn()} />);
+    const fieldOrder = Array.from(document.querySelectorAll('.line-edit-fields > label'))
+      .map((label) => [...label.classList].find((className) => className.startsWith('line-field-')))
+      .filter(Boolean);
+    expect(fieldOrder).toEqual(['line-field-quantity', 'line-field-kind', 'line-field-unit', 'line-field-price']);
+  });
+
+  it('removes a line item from the quote', async () => {
+    const onChange = vi.fn();
+    render(<StatefulWrapper initialItems={[item()]} onChange={onChange} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /item verwijderen/i }));
+
+    expect(removeLineItem).toHaveBeenCalledWith('line-1');
+    expect(screen.queryByDisplayValue('Dakpannen leggen – materiaal')).not.toBeInTheDocument();
+    expect(onChange.mock.calls.at(-1)?.[0]).toEqual([]);
+  });
+
+  it('does not show the remove action for read-only quotes', () => {
+    render(<LineItemsEditor items={[item()]} onChange={vi.fn()} readOnly />);
+    expect(screen.queryByRole('button', { name: /item verwijderen/i })).not.toBeInTheDocument();
   });
 });

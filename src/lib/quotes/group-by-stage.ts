@@ -1,6 +1,6 @@
 import type { PipelineStage, Quote } from '@/lib/supabase/types';
 
-export type QuoteWithTotal = Quote & { grandTotalCents: number };
+export type QuoteWithTotal = Quote & { grandTotalCents: number | null; pricingState?: 'fully_priced' | 'partially_priced' | 'unpriced' };
 
 export type GroupedQuotes = {
   concept: QuoteWithTotal[];

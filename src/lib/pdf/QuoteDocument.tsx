@@ -40,6 +40,7 @@ export default function QuoteDocument({ model }: { model: QuoteViewModel }) {
             <Text style={styles.muted}>Datum: {model.dateNl}</Text>
             {!!model.validUntilNl && <Text style={styles.muted}>Geldig tot: {model.validUntilNl}</Text>}
             {!!model.orderReference && <Text style={styles.muted}>Referentie: {model.orderReference}</Text>}
+            {model.quoteKind === 'meerwerk' && <Text style={styles.notice}>Meerwerk bij offerte {model.originalQuoteNumber ?? '—'}</Text>}
           </View>
         </View>
 
@@ -53,10 +54,7 @@ export default function QuoteDocument({ model }: { model: QuoteViewModel }) {
 
         <View style={styles.row}>
           <Text style={styles.cellDesc}>Omschrijving</Text>
-          <Text style={styles.cellQty}>Aantal</Text>
-          <Text style={styles.cellPrice}>Prijs/eenheid</Text>
-          <Text style={styles.cellVat}>Btw</Text>
-          <Text style={styles.cellTotal}>Totaal</Text>
+          {model.showPriceColumns && <><Text style={styles.cellQty}>Aantal</Text><Text style={styles.cellPrice}>Prijs/eenheid</Text><Text style={styles.cellVat}>Btw</Text><Text style={styles.cellTotal}>Totaal</Text></>}
         </View>
 
         {model.groups.map((group) => (
@@ -65,17 +63,14 @@ export default function QuoteDocument({ model }: { model: QuoteViewModel }) {
             {group.rows.map((row, index) => (
               <View key={`${group.title}-${index}`} style={styles.row}>
                 <Text style={styles.cellDesc}>{row.description}</Text>
-                <Text style={styles.cellQty}>{`${row.quantity} ${row.unit}`}</Text>
-                <Text style={styles.cellPrice}>{row.unitPrice}</Text>
-                <Text style={styles.cellVat}>{row.vatLabel}</Text>
-                <Text style={styles.cellTotal}>{row.lineTotal}</Text>
+                {model.showPriceColumns && <><Text style={styles.cellQty}>{`${row.quantity} ${row.unit}`}</Text><Text style={styles.cellPrice}>{row.unitPrice}</Text><Text style={styles.cellVat}>{row.vatLabel}</Text><Text style={styles.cellTotal}>{row.lineTotal}</Text></>}
               </View>
             ))}
           </View>
         ))}
 
         <View style={styles.totals}>
-          {model.totals.vatGroups.map((group) => (
+          {model.showPriceColumns && model.totals.vatGroups.map((group) => (
             <View key={group.vatRate}>
               <View style={styles.totalRow}>
                 <Text>Subtotaal ({group.vatRate === 0 ? 'verlegging' : group.vatRate === 0.06 ? '6%' : '21%'})</Text>
@@ -88,10 +83,16 @@ export default function QuoteDocument({ model }: { model: QuoteViewModel }) {
             </View>
           ))}
           <View style={styles.grandTotal}>
-            <Text>Totaal incl. btw</Text>
-            <Text>{formatEuros(model.totals.grandTotalCents)}</Text>
+            <Text>{model.totals.state === 'fully_priced' ? 'Totaal incl. btw' : model.totals.state === 'partially_priced' ? 'Totaal gekende werken' : 'Totaal'}</Text>
+            <Text>{model.totals.state === 'unpriced' ? 'Prijs nog te bepalen' : formatEuros(model.totals.knownTotalCents)}</Text>
           </View>
         </View>
+
+        {model.hasUnpricedLines && (
+          <Text style={styles.notice}>
+            {model.totals.state === 'unpriced' ? 'De prijs voor deze werken wordt later bepaald.' : 'Niet-geprijsde werken zijn aangeduid als “Prijs nog te bepalen” en zijn niet opgenomen in het gekende totaal.'}
+          </Text>
+        )}
 
         {model.showsReducedVatNotice && (
           <Text style={styles.notice}>

@@ -10,13 +10,18 @@ export type SendQuoteEmailResult = {
   messageId: string | null;
 };
 
-export async function sendQuoteEmail(args: {
+export type MailboxAttachment = {
+  filename: string;
+  contentType: string;
+  content: Uint8Array;
+};
+
+export async function sendMailboxEmail(args: {
   userId: string;
   to: string;
   subject: string;
   message: string;
-  pdf: Uint8Array;
-  filename: string;
+  attachment?: MailboxAttachment;
 }): Promise<SendQuoteEmailResult> {
   const mailbox = await getMailboxWithValidToken(args.userId);
   const htmlBody = plainTextToHtml(args.message);
@@ -28,11 +33,7 @@ export async function sendQuoteEmail(args: {
       subject: args.subject,
       textBody: args.message,
       htmlBody,
-      attachment: {
-        filename: args.filename,
-        contentType: 'application/pdf',
-        content: args.pdf,
-      },
+      attachment: args.attachment,
     });
 
     const response = await fetch(
@@ -74,14 +75,16 @@ export async function sendQuoteEmail(args: {
         subject: args.subject,
         body: { contentType: 'HTML', content: htmlBody },
         toRecipients: [{ emailAddress: { address: args.to } }],
-        attachments: [
-          {
-            '@odata.type': '#microsoft.graph.fileAttachment',
-            name: args.filename,
-            contentType: 'application/pdf',
-            contentBytes: Buffer.from(args.pdf).toString('base64'),
-          },
-        ],
+        ...(args.attachment ? {
+          attachments: [
+            {
+              '@odata.type': '#microsoft.graph.fileAttachment',
+              name: args.attachment.filename,
+              contentType: args.attachment.contentType,
+              contentBytes: Buffer.from(args.attachment.content).toString('base64'),
+            },
+          ],
+        } : {}),
       },
       saveToSentItems: true,
     }),
@@ -100,4 +103,25 @@ export async function sendQuoteEmail(args: {
   }
 
   return { provider: 'outlook', from: mailbox.email_address, messageId: null };
+}
+
+export async function sendQuoteEmail(args: {
+  userId: string;
+  to: string;
+  subject: string;
+  message: string;
+  pdf: Uint8Array;
+  filename: string;
+}): Promise<SendQuoteEmailResult> {
+  return sendMailboxEmail({
+    userId: args.userId,
+    to: args.to,
+    subject: args.subject,
+    message: args.message,
+    attachment: {
+      filename: args.filename,
+      contentType: 'application/pdf',
+      content: args.pdf,
+    },
+  });
 }

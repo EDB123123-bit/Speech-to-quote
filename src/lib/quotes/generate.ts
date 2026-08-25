@@ -1,14 +1,7 @@
 import { expandTasksToLineItems, type NewLineItem } from '@/lib/quotes/expand';
 import { extractWithCatalogFallback } from '@/lib/quotes/extract-with-fallback';
 import type { ExtractionResult } from '@/lib/ai/schemas';
-import type { CatalogItem, PipelineStep } from '@/lib/supabase/types';
-
-export class EmptyCatalogError extends Error {
-  constructor() {
-    super('Voeg eerst minstens één item toe aan je prijslijst.');
-    this.name = 'EmptyCatalogError';
-  }
-}
+import type { PipelineStep } from '@/lib/supabase/types';
 
 /** Thrown when a draft exists but extraction failed — the caller needs the id. */
 export class PartialQuoteError extends Error {
@@ -22,6 +15,9 @@ export class PartialQuoteError extends Error {
   }
 }
 
+/** @deprecated Catalogue-backed generation was removed in V1; retained for old callers. */
+export class EmptyCatalogError extends Error {}
+
 /** Surfaces `error.cause` too — the underlying SDK/API error is otherwise swallowed in logs. */
 function errorDetail(error: unknown): { error: string; cause?: string } {
   const cause = error instanceof Error && error.cause instanceof Error ? String(error.cause) : undefined;
@@ -29,13 +25,13 @@ function errorDetail(error: unknown): { error: string; cause?: string } {
 }
 
 export type GenerateDeps = {
-  loadCatalog: (contractorId: string) => Promise<CatalogItem[]>;
   uploadAudio: (contractorId: string, audio: File) => Promise<string>;
-  createDraftQuote: (contractorId: string, audioPath: string) => Promise<string>;
+  createDraftQuote: (contractorId: string, audioPath: string, parentQuoteId?: string | null) => Promise<string>;
   transcribe: (audio: File) => Promise<string>;
-  extract: (transcript: string, catalog: CatalogItem[]) => Promise<ExtractionResult>;
+  extract: (transcript: string) => Promise<ExtractionResult>;
   saveTranscript: (quoteId: string, transcript: string) => Promise<void>;
   saveLineItems: (quoteId: string, rows: NewLineItem[]) => Promise<void>;
+  suggestLineItems?: (quoteId: string, rows: NewLineItem[]) => Promise<NewLineItem[]>;
   saveClarifications: (quoteId: string, items: { questionNl: string }[]) => Promise<void>;
   log: (event: {
     quoteId: string | null;
@@ -48,12 +44,9 @@ export type GenerateDeps = {
 
 export async function generateQuote(
   deps: GenerateDeps,
-  args: { audio: File; contractorId: string },
+  args: { audio: File; contractorId: string; parentQuoteId?: string | null },
 ): Promise<{ quoteId: string }> {
   const { contractorId, audio } = args;
-
-  const catalog = await deps.loadCatalog(contractorId);
-  if (catalog.length === 0) throw new EmptyCatalogError();
 
   // --- upload -------------------------------------------------------------
   let audioPath: string;
@@ -65,7 +58,7 @@ export async function generateQuote(
     throw error;
   }
 
-  const quoteId = await deps.createDraftQuote(contractorId, audioPath);
+  const quoteId = await deps.createDraftQuote(contractorId, audioPath, args.parentQuoteId ?? null);
 
   // --- transcribe ---------------------------------------------------------
   let transcript: string;
@@ -96,7 +89,7 @@ export async function generateQuote(
   // --- extract ------------------------------------------------------------
   let extraction: ExtractionResult;
   try {
-    const outcome = await extractWithCatalogFallback({ transcript, catalog, extract: deps.extract });
+    const outcome = await extractWithCatalogFallback({ transcript, extract: deps.extract });
     extraction = outcome.extraction;
     await deps.log({
       quoteId,
@@ -116,7 +109,8 @@ export async function generateQuote(
   }
 
   try {
-    await deps.saveLineItems(quoteId, expandTasksToLineItems(extraction.tasks, catalog));
+    const expandedRows = expandTasksToLineItems(extraction.tasks);
+    await deps.saveLineItems(quoteId, deps.suggestLineItems ? await deps.suggestLineItems(quoteId, expandedRows) : expandedRows);
     await deps.saveClarifications(quoteId, extraction.clarifications);
   } catch (error) {
     await deps.log({

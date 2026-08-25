@@ -1,4 +1,5 @@
 -- pipeline_stages: contractor-defined stages after a quote is finalized.
+-- Migration version aligned with the hosted production history.
 -- Concept and Afgewerkt are NOT rows here — they're derived directly from
 -- quotes.status, so there's nothing to keep in sync and nothing that can be
 -- accidentally renamed or deleted out from under the app.

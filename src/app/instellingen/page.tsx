@@ -6,6 +6,7 @@ import ProfileForm from './ProfileForm';
 import { disconnectMailbox } from './actions';
 import PipelineStagesForm from './PipelineStagesForm';
 import CatalogSuggestions from '@/components/CatalogSuggestions';
+import OnboardingHelpButton from '@/components/onboarding/OnboardingHelpButton';
 import type { CatalogPriceSuggestion } from '@/lib/supabase/types';
 
 const MAILBOX_ERRORS: Record<string, string> = {
@@ -51,6 +52,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         <a href="#prijslijst">Prijslijst</a>
         <a href="#mailbox">Mailbox</a>
         <a href="#pijplijnfasen">Pijplijnfasen</a>
+        <a href="#uitleg">Uitleg</a>
       </nav>
 
       <section id="bedrijf" className="settings-section">
@@ -97,6 +99,14 @@ export default async function SettingsPage({ searchParams }: Props) {
         </p>
         <PipelineStagesForm stages={(stages ?? []) as PipelineStage[]} />
       </section>
+
+      <section id="uitleg" className="settings-section">
+        <h2 className="section-heading">Hulp bij de app</h2>
+        <p className="section-copy">
+          Bekijk de korte uitleg opnieuw wanneer je wilt.
+        </p>
+        <OnboardingHelpButton className="btn btn-outline" />
+      </section>
     </main>
   );
 }
@@ -127,11 +137,15 @@ function MailboxCard({ mailbox }: { mailbox: MailboxSummary | null }) {
       <p className="mt-1 text-sm font-medium text-muted">
         {provider} · {mailbox.status === 'connected' ? 'Verbonden' : 'Opnieuw verbinden nodig'}
       </p>
+      {mailbox.provider === 'gmail' && mailbox.status === 'connected' && mailbox.gmail_read_enabled === false && (
+        <p className="mt-2 text-sm font-semibold text-warning">Gmail-lezen is nog niet geactiveerd. Verbind Gmail opnieuw om aanvragen te importeren.</p>
+      )}
       <div className="mt-4 flex flex-wrap gap-2">
         <a href={reconnectHref} className="btn btn-outline">
           {mailbox.status === 'connected' ? 'Herverbinden' : 'Opnieuw verbinden'}
         </a>
         <form action={disconnectMailbox}>
+          <input type="hidden" name="provider" value={mailbox.provider} />
           <button type="submit" className="btn btn-outline text-critical">
             Verbinding verbreken
           </button>

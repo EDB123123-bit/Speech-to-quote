@@ -3,6 +3,7 @@ import { requireContractor, UnauthorizedError } from '@/lib/auth/require-contrac
 import { finalizeQuote, type FinalizeDeps } from '@/lib/quotes/finalize';
 import { renderQuotePdf } from '@/lib/pdf/render';
 import { logPipelineEvent } from '@/lib/logging/pipeline-events';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 import type { Contractor, Quote, QuoteClarification, QuoteLineItem } from '@/lib/supabase/types';
 
 export const runtime = 'nodejs';
@@ -11,8 +12,11 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
 
   let supabase: Awaited<ReturnType<typeof requireContractor>>['supabase'];
+  let contractorId: string;
   try {
-    supabase = (await requireContractor()).supabase;
+    const auth = await requireContractor();
+    supabase = auth.supabase;
+    contractorId = auth.contractor.id;
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Niet aangemeld' }, { status: 401 });
@@ -34,22 +38,39 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return (data ?? []) as QuoteClarification[];
     },
     updateStatusToFinal: async (quoteId) => {
-      const { error } = await supabase
-        .from('quotes').update({ status: 'final' }).eq('id', quoteId).eq('status', 'draft');
+      const { data, error } = await supabase
+        .from('quotes')
+        .update({ status: 'final' })
+        .eq('id', quoteId)
+        .eq('status', 'draft')
+        .select('id')
+        .maybeSingle();
       if (error) throw new Error(error.message);
+      if (!data) throw new Error('quote_status_changed');
     },
     loadContractor: async (contractorId) => {
       const { data } = await supabase.from('contractors').select('*').eq('id', contractorId).single();
       return data as Contractor | null;
     },
+    loadParentQuoteNumber: async (parentId) => {
+      const { data } = await supabase.from('quotes').select('quote_number').eq('id', parentId).maybeSingle();
+      return data?.quote_number ?? null;
+    },
     renderPdf: renderQuotePdf,
     uploadPdf: async (path, pdf) => {
-      const { error } = await supabase.storage
-        .from('quote-pdfs').upload(path, pdf, { contentType: 'application/pdf', upsert: true });
+      const { error } = await createAdminSupabase().storage
+        .from('quote-pdfs').upload(path, pdf, { contentType: 'application/pdf', upsert: false });
       if (error) throw new Error(error.message);
     },
     savePdfPath: async (quoteId, path) => {
-      const { error } = await supabase.from('quotes').update({ pdf_path: path }).eq('id', quoteId);
+      // Once the status is final, commercial RLS intentionally blocks normal
+      // client updates. Persisting the server-generated PDF identity is a
+      // server-owned operation and remains allowed before acceptance.
+      const { error } = await createAdminSupabase().rpc('set_quote_pdf_path', {
+        p_quote_id: quoteId,
+        p_contractor_id: contractorId,
+        p_pdf_path: path,
+      });
       if (error) throw new Error(error.message);
     },
     log: logPipelineEvent,

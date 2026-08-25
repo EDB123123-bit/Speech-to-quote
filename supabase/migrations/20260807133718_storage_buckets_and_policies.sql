@@ -1,4 +1,5 @@
 -- Storage buckets for uploaded audio recordings and generated quote PDFs.
+-- Migration version aligned with the hosted production history.
 -- Both are private: every read goes through a signed URL or the
 -- authenticated user's own RLS-scoped access, never a public URL.
 insert into storage.buckets (id, name, public)

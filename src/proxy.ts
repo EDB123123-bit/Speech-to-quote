@@ -1,6 +1,23 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+export function isPublicPath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth') ||
+    // Customer acceptance is token-authenticated and must not require a
+    // contractor session. Keep the singular route separate from /offertes.
+    pathname === '/offerte' ||
+    pathname.startsWith('/offerte/') ||
+    pathname === '/api/offerte' ||
+    pathname.startsWith('/api/offerte/')
+  );
+}
+
+export function isAuthEntryPath(pathname: string): boolean {
+  return pathname.startsWith('/login') || pathname.startsWith('/auth');
+}
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -22,13 +39,15 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data } = await supabase.auth.getUser();
-  const isPublic =
-    request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/auth');
+  const pathname = request.nextUrl.pathname;
+  const isPublic = isPublicPath(pathname);
 
   if (!data.user && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
-  if (data.user && isPublic) {
+  // A contractor may open the same tokenized customer page for support or
+  // verification. Only authentication entry pages redirect signed-in users.
+  if (data.user && isAuthEntryPath(pathname)) {
     return NextResponse.redirect(new URL('/offertes', request.url));
   }
 

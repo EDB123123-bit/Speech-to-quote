@@ -1,6 +1,6 @@
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import type { MailboxConnection } from '@/lib/supabase/types';
-import { getMailboxConnection, markMailboxDisconnected } from './connection';
+import { getMailboxConnection, getMailboxConnectionForProvider, markMailboxDisconnected } from './connection';
 import { getGoogleOAuthConfig, getMicrosoftOAuthConfig } from './config';
 import { MailboxError } from './errors';
 
@@ -8,7 +8,14 @@ const TOKEN_BUFFER_MS = 5 * 60 * 1000;
 const OUTLOOK_SCOPES = 'offline_access Mail.Send User.Read';
 
 export async function getMailboxWithValidToken(userId: string): Promise<MailboxConnection> {
-  const connection = await getMailboxConnection(userId);
+  return getMailboxWithValidConnection(await getMailboxConnection(userId));
+}
+
+export async function getMailboxWithValidTokenForProvider(userId: string, provider: MailboxConnection['provider']): Promise<MailboxConnection> {
+  return getMailboxWithValidConnection(await getMailboxConnectionForProvider(userId, provider));
+}
+
+async function getMailboxWithValidConnection(connection: MailboxConnection | null): Promise<MailboxConnection> {
   if (!connection) {
     throw new MailboxError('not_connected', 'Verbind eerst een mailbox in Instellingen.');
   }
@@ -55,6 +62,7 @@ export async function getMailboxWithValidToken(userId: string): Promise<MailboxC
     access_token?: string;
     expires_in?: number;
     refresh_token?: string;
+    scope?: string;
   };
   if (!tokens.access_token || !tokens.expires_in) {
     await markMailboxDisconnected(connection.id);
@@ -67,6 +75,10 @@ export async function getMailboxWithValidToken(userId: string): Promise<MailboxC
     refresh_token: tokens.refresh_token || connection.refresh_token,
     token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
     status: 'connected' as const,
+    oauth_scope: tokens.scope || connection.oauth_scope || null,
+    gmail_read_enabled: isGmail
+      ? (tokens.scope || connection.oauth_scope || '').split(/\s+/u).includes('https://www.googleapis.com/auth/gmail.readonly')
+      : false,
     updated_at: new Date().toISOString(),
   };
 
@@ -77,6 +89,8 @@ export async function getMailboxWithValidToken(userId: string): Promise<MailboxC
       refresh_token: updated.refresh_token,
       token_expires_at: updated.token_expires_at,
       status: updated.status,
+      oauth_scope: updated.oauth_scope,
+      gmail_read_enabled: updated.gmail_read_enabled,
       updated_at: updated.updated_at,
     })
     .eq('id', connection.id);

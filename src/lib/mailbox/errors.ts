@@ -3,7 +3,8 @@ export type MailboxErrorCode =
   | 'disconnected'
   | 'configuration'
   | 'refresh_failed'
-  | 'provider_failed';
+  | 'provider_failed'
+  | 'gmail_read_not_connected';
 
 export class MailboxError extends Error {
   constructor(

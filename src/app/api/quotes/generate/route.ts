@@ -3,8 +3,9 @@ import { requireContractor, UnauthorizedError } from '@/lib/auth/require-contrac
 import { transcribeAudio, TranscriptionError } from '@/lib/ai/transcribe';
 import { extractQuoteTasks, ExtractionError } from '@/lib/ai/extract';
 import { logPipelineEvent } from '@/lib/logging/pipeline-events';
-import { generateQuote, EmptyCatalogError, PartialQuoteError, type GenerateDeps } from '@/lib/quotes/generate';
-import type { CatalogItem } from '@/lib/supabase/types';
+import { generateQuote, PartialQuoteError, type GenerateDeps } from '@/lib/quotes/generate';
+import { applyHistoricalSuggestions, loadHistoricalPriceCandidates } from '@/lib/quotes/historical-suggestions-server';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -37,22 +38,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Geen audio ontvangen' }, { status: 400 });
   }
 
+  const rawParentQuoteId = String(form.get('parentQuoteId') ?? '').trim();
+  const parentQuoteId = rawParentQuoteId || null;
+  if (parentQuoteId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(parentQuoteId)) {
+    return NextResponse.json({ error: 'Ongeldige oorspronkelijke offerte.' }, { status: 422 });
+  }
+
   const deps: GenerateDeps = {
-    loadCatalog: async () => {
-      const { data, error } = await supabase.from('catalog_items').select('*');
-      if (error) throw new Error(`Prijslijst laden mislukt: ${error.message}`);
-      return (data ?? []) as CatalogItem[];
-    },
     uploadAudio: async (id, file) => {
       const path = `${id}/${crypto.randomUUID()}.webm`;
       const { error } = await supabase.storage.from('quote-audio').upload(path, file);
       if (error) throw new Error(`Upload mislukt: ${error.message}`);
       return path;
     },
-    createDraftQuote: async (id, audioPath) => {
+    createDraftQuote: async (id, audioPath, parentId) => {
+      if (parentId) {
+        const admin = createAdminSupabase();
+        const { data, error } = await admin.rpc('create_meerwerk_quote', {
+          p_parent_quote_id: parentId,
+          p_contractor_id: id,
+        });
+        if (error || !data) throw new Error(`Meerwerkofferte aanmaken mislukt${error ? `: ${error.message}` : ''}`);
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row?.quote_id) throw new Error('Meerwerkofferte aanmaken mislukt.');
+        const { error: audioError } = await admin.from('quotes').update({ audio_path: audioPath }).eq('id', row.quote_id).eq('status', 'draft');
+        if (audioError) throw new Error(`Audio aan meerwerkofferte koppelen mislukt: ${audioError.message}`);
+        return row.quote_id as string;
+      }
       const { data, error } = await supabase
         .from('quotes')
-        .insert({ contractor_id: id, audio_path: audioPath, status: 'draft' })
+        .insert({ contractor_id: id, audio_path: audioPath, status: 'draft', source: 'voice' })
         .select('id')
         .single();
       if (error || !data) throw new Error(`Aanmaken van offerte mislukt${error ? `: ${error.message}` : ''}`);
@@ -71,6 +86,10 @@ export async function POST(request: Request) {
         .insert(rows.map((row) => ({ ...row, quote_id: quoteId })));
       if (error) throw new Error('Opslaan van offertelijnen mislukt');
     },
+    suggestLineItems: async (quoteId, rows) => {
+      const candidates = await loadHistoricalPriceCandidates(supabase, contractorId, quoteId);
+      return applyHistoricalSuggestions(rows, candidates) as typeof rows;
+    },
     saveClarifications: async (quoteId, items) => {
       if (items.length === 0) return;
       const { error } = await supabase
@@ -82,7 +101,7 @@ export async function POST(request: Request) {
   };
 
   try {
-    const { quoteId } = await generateQuote(deps, { audio, contractorId });
+    const { quoteId } = await generateQuote(deps, { audio, contractorId, parentQuoteId });
     return NextResponse.json({ quoteId }, { status: 201 });
   } catch (error) {
     console.error('[quotes/generate] verwerking mislukt', error);
@@ -92,15 +111,12 @@ export async function POST(request: Request) {
         { status: 502 },
       );
     }
-    if (error instanceof EmptyCatalogError) {
-      return NextResponse.json({ error: error.message }, { status: 409 });
-    }
     if (error instanceof PartialQuoteError) {
       const extractionFailed = error.stage === 'extract' || error.cause instanceof ExtractionError;
       return NextResponse.json(
         {
           error: extractionFailed
-            ? 'De opname is bewaard. De prijslijst kon nog niet automatisch worden toegepast; probeer opnieuw.'
+            ? 'De opname is bewaard. De werken konden nog niet automatisch worden verwerkt; probeer opnieuw.'
             : 'De opname is bewaard, maar kon nog niet worden uitgeschreven. Probeer opnieuw.',
           quoteId: error.quoteId,
         },

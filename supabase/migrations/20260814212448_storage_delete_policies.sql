@@ -1,4 +1,5 @@
 -- Quote deletion removes its private audio and PDF objects before the
+-- Migration version aligned with the hosted production history.
 -- database row is deleted, so authenticated contractors need delete access
 -- to objects under their own storage folder.
 create policy quote_audio_delete_own on storage.objects

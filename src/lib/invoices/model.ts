@@ -12,7 +12,6 @@ export type InvoicePartySnapshot = {
   email: string;
   phone: string;
   legalForm: string;
-  rpr: string;
   registrationNumber: string;
   iban: string;
   peppolId: string;
@@ -39,7 +38,6 @@ function party(value: Record<string, unknown>, fallback: Partial<InvoicePartySna
     email: String(value.email ?? fallback.email ?? ''),
     phone: String(value.phone ?? fallback.phone ?? ''),
     legalForm: String(value.legalForm ?? fallback.legalForm ?? ''),
-    rpr: String(value.rpr ?? fallback.rpr ?? ''),
     registrationNumber: String(value.registrationNumber ?? fallback.registrationNumber ?? ''),
     iban: String(value.iban ?? fallback.iban ?? ''),
     peppolId: String(value.peppolId ?? fallback.peppolId ?? ''),
@@ -64,7 +62,6 @@ export function buildCanonicalInvoice(invoice: Invoice, lines: InvoiceLineItem[]
     email: contractor.email ?? '',
     phone: contractor.phone ?? '',
     legalForm: contractor.legal_form ?? '',
-    rpr: contractor.rpr ?? '',
     registrationNumber: contractor.registration_number ?? '',
     iban: contractor.iban ?? '',
     peppolId: '',
@@ -79,7 +76,7 @@ export function buildCanonicalInvoice(invoice: Invoice, lines: InvoiceLineItem[]
     enterpriseNumber: invoice.customer_enterprise_number ?? '',
     email: invoice.customer_email ?? '',
     phone: invoice.customer_phone ?? '',
-    legalForm: '', rpr: '', registrationNumber: '', iban: '', peppolId: invoice.customer_peppol_id ?? '',
+    legalForm: '', registrationNumber: '', iban: '', peppolId: invoice.customer_peppol_id ?? '',
   };
   return {
     invoice,

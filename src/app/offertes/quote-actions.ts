@@ -2,6 +2,19 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireContractor } from '@/lib/auth/require-contractor';
+import { createAdminSupabase } from '@/lib/supabase/admin';
+
+export async function createManualQuote(): Promise<void> {
+  const { supabase, contractor } = await requireContractor();
+  const { data, error } = await supabase
+    .from('quotes')
+    .insert({ contractor_id: contractor.id, status: 'draft', source: 'manual' })
+    .select('id')
+    .single();
+  if (error || !data) throw new Error('Handmatige offerte aanmaken mislukt.');
+  const { redirect } = await import('next/navigation');
+  redirect(`/offertes/${data.id}`);
+}
 
 export async function saveQuoteMetadata(quoteId: string, form: FormData): Promise<void> {
   const { supabase } = await requireContractor();
@@ -22,15 +35,38 @@ export async function saveQuoteMetadata(quoteId: string, form: FormData): Promis
   revalidatePath('/offertes');
 }
 
+/** Create a blank draft change order for an already accepted standard quote. */
+export async function createMeerwerkQuote(parentQuoteId: string): Promise<void> {
+  const { contractor } = await requireContractor();
+  const admin = createAdminSupabase();
+  const { data, error } = await admin.rpc('create_meerwerk_quote', {
+    p_parent_quote_id: parentQuoteId,
+    p_contractor_id: contractor.id,
+  });
+  if (error || !data) {
+    if (error?.message.includes('meerwerk_parent_invalid')) {
+      throw new Error('Een meerwerkofferte kan alleen vanuit een aanvaarde standaardofferte worden gemaakt.');
+    }
+    throw new Error('Meerwerkofferte aanmaken mislukt.');
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.quote_id) throw new Error('Meerwerkofferte aanmaken mislukt.');
+  revalidatePath(`/offertes/${parentQuoteId}`);
+  revalidatePath('/offertes');
+  const { redirect } = await import('next/navigation');
+  redirect(`/offertes/${row.quote_id}`);
+}
+
 export async function deleteQuote(quoteId: string): Promise<void> {
   const { supabase } = await requireContractor();
   const { data: quote, error: fetchError } = await supabase
     .from('quotes')
-    .select('id, audio_path, pdf_path')
+    .select('id, status, audio_path, pdf_path')
     .eq('id', quoteId)
     .single();
 
   if (fetchError || !quote) throw new Error('Offerte niet gevonden.');
+  if (quote.status !== 'draft') throw new Error('Alleen conceptoffertes kunnen verwijderd worden.');
 
   if (quote.audio_path) {
     const { error } = await supabase.storage.from('quote-audio').remove([quote.audio_path]);
@@ -38,7 +74,7 @@ export async function deleteQuote(quoteId: string): Promise<void> {
   }
 
   if (quote.pdf_path) {
-    const { error } = await supabase.storage.from('quote-pdfs').remove([quote.pdf_path]);
+    const { error } = await createAdminSupabase().storage.from('quote-pdfs').remove([quote.pdf_path]);
     if (error) throw new Error('Pdf van de offerte kon niet verwijderd worden.');
   }
 

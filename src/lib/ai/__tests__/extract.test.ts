@@ -51,11 +51,11 @@ describe('buildExtractionPrompt', () => {
     expect(prompt).toContain('tachtig vierkante meter');
   });
 
-  it('includes every catalog item with its id and unit', () => {
+  it('does not include a fixed catalogue in the extraction prompt', () => {
     const prompt = buildExtractionPrompt('x', catalog);
-    expect(prompt).toContain('cat-1');
-    expect(prompt).toContain('Dakpannen leggen (kleitegels)');
-    expect(prompt).toContain('m²');
+    expect(prompt).not.toContain('cat-1');
+    expect(prompt).toContain('unitPriceCents');
+    expect(prompt).toContain('priceExplicit');
   });
 
   it('states that prices must never be invented', () => {

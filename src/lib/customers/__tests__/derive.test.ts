@@ -107,9 +107,9 @@ describe('deriveCustomers', () => {
     expect(customers[0].quotes[0].quoteNumber).toBe('ABC12345');
   });
 
-  it('treats a missing total as zero rather than NaN', () => {
+  it('keeps a missing total unknown rather than displaying zero', () => {
     const customers = deriveCustomers([quote({ id: 'a' })], totals());
-    expect(customers[0].totalCents).toBe(0);
+    expect(customers[0].totalCents).toBeNull();
   });
 });
 

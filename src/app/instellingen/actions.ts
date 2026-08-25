@@ -29,8 +29,9 @@ export async function saveProfile(form: FormData): Promise<void> {
   revalidatePath('/instellingen');
 }
 
-export async function disconnectMailbox(): Promise<void> {
+export async function disconnectMailbox(form: FormData): Promise<void> {
   const { contractor } = await requireContractor();
-  await disconnectMailboxConnection(contractor.id);
+  const provider = String(form.get('provider') ?? '').trim();
+  await disconnectMailboxConnection(contractor.id, provider === 'gmail' || provider === 'outlook' ? provider : undefined);
   revalidatePath('/instellingen');
 }

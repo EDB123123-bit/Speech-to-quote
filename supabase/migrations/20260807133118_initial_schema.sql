@@ -1,4 +1,5 @@
 -- Contractors extend Supabase auth.users with business details for the PDF letterhead.
+-- Migration version aligned with the hosted production history.
 create table contractors (
   id uuid primary key references auth.users(id) on delete cascade,
   company_name text not null,

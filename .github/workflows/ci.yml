@@ -22,11 +22,12 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - name: Validate Supabase migrations and database security tests
-        run: |
-          npx --yes supabase@2.114.0 start
-          npx --yes supabase@2.114.0 db reset
-          npx --yes supabase@2.114.0 test db
+      - name: Start local Supabase
+        run: npx --yes supabase@2.114.0 start
+      - name: Reset local database
+        run: npx --yes supabase@2.114.0 db reset
+      - name: Run Supabase database security tests
+        run: npx --yes supabase@2.114.0 test db
       - run: npm run validate:peppol
       - run: npm run build
       - if: always()

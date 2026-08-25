@@ -13,6 +13,7 @@ const GMAIL_SCOPES = [
   'openid',
   'email',
   'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.readonly',
 ].join(' ');
 const OUTLOOK_SCOPES = 'offline_access Mail.Send User.Read';
 
@@ -20,6 +21,7 @@ type OAuthTokens = {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  scope?: string;
 };
 
 export async function handleMailboxOAuth(
@@ -116,22 +118,34 @@ async function handleCallback(
   if (!emailAddress) return settingsRedirect(request, 'profile_failed', provider);
 
   const now = new Date().toISOString();
-  const { error } = await createAdminSupabase()
-    .from('mailbox_connections')
-    .upsert(
-      {
-        user_id: user.id,
-        provider,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        email_address: emailAddress,
-        token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-        status: 'connected',
-        connected_at: now,
-        updated_at: now,
-      },
-      { onConflict: 'user_id' },
-    );
+  const admin = createAdminSupabase();
+  const { data: existing } = await admin.from('mailbox_connections')
+    .select('id,is_default')
+    .eq('user_id', user.id)
+    .eq('provider', provider)
+    .maybeSingle();
+  const { count: existingCount } = await admin.from('mailbox_connections')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id);
+  const scope = tokens.scope ?? (provider === 'gmail' ? GMAIL_SCOPES : OUTLOOK_SCOPES);
+  const values = {
+    user_id: user.id,
+    provider,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    email_address: emailAddress,
+    token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+    status: 'connected',
+    is_default: existing?.is_default ?? existingCount === 0,
+    oauth_scope: scope,
+    gmail_read_enabled: provider === 'gmail' && scope.split(/\s+/u).includes('https://www.googleapis.com/auth/gmail.readonly'),
+    connected_at: now,
+    updated_at: now,
+  };
+  const result = existing
+    ? await admin.from('mailbox_connections').update(values).eq('id', existing.id)
+    : await admin.from('mailbox_connections').insert(values);
+  const { error } = result;
 
   if (error) {
     console.error(`[mailbox:${provider}] connection save failed`, error.message);

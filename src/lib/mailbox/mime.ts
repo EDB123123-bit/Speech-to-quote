@@ -10,8 +10,34 @@ export function buildMimeMessage(args: {
   subject: string;
   textBody: string;
   htmlBody: string;
-  attachment: MimeAttachment;
+  attachment?: MimeAttachment;
 }): string {
+  if (!args.attachment) {
+    const alternativeBoundary = `alternative_${crypto.randomUUID()}`;
+    return [
+      `From: ${safeHeader(args.from)}`,
+      `To: ${safeHeader(args.to)}`,
+      `Subject: ${encodeHeader(args.subject)}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+      '',
+      `--${alternativeBoundary}`,
+      'Content-Type: text/plain; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      base64Lines(Buffer.from(args.textBody, 'utf8')),
+      '',
+      `--${alternativeBoundary}`,
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      base64Lines(Buffer.from(args.htmlBody, 'utf8')),
+      '',
+      `--${alternativeBoundary}--`,
+      '',
+    ].join('\r\n');
+  }
+
   const mixedBoundary = `mixed_${crypto.randomUUID()}`;
   const alternativeBoundary = `alternative_${crypto.randomUUID()}`;
   const filename = safeFilename(args.attachment.filename);

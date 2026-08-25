@@ -36,11 +36,11 @@ describe('checkFinalizeGate', () => {
     expect(blockers.map((b) => b.code)).toContain('no_line_items');
   });
 
-  it('blocks a line item with no price', () => {
+  it('allows a line item with an unknown price', () => {
     const blockers = checkFinalizeGate({
       quote: completeQuote, lineItems: [line({ unit_price_cents: null })], clarifications: [],
     });
-    expect(blockers.map((b) => b.code)).toContain('incomplete_line_item');
+    expect(blockers.map((b) => b.code)).not.toContain('incomplete_line_item');
   });
 
   it('blocks a line item with no VAT rate', () => {
@@ -97,6 +97,13 @@ describe('checkFinalizeGate', () => {
   it('blocks a final quote independently even if everything else is complete', () => {
     const blockers = checkFinalizeGate({
       quote: { ...completeQuote, status: 'final' }, lineItems: [line()], clarifications: [],
+    });
+    expect(blockers).toEqual([{ code: 'already_final', messageNl: expect.any(String) }]);
+  });
+
+  it.each(['sent', 'accepted'] as const)('blocks a %s quote from re-entering finalization', (status) => {
+    const blockers = checkFinalizeGate({
+      quote: { ...completeQuote, status }, lineItems: [line()], clarifications: [],
     });
     expect(blockers).toEqual([{ code: 'already_final', messageNl: expect.any(String) }]);
   });

@@ -6,12 +6,14 @@ import { redirect } from 'next/navigation';
 import { requireContractor } from '@/lib/auth/require-contractor';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { buildCanonicalInvoice } from '@/lib/invoices/model';
-import { normalizeBelgianVat, normalizeEnterpriseNumber, normalizeUnitCode, parseAddress, peppolParticipantId, REDUCED_VAT_DECLARATION_NL, REDUCED_VAT_DECLARATION_VERSION } from '@/lib/invoices/constants';
-import { invoiceLineTotalCents } from '@/lib/invoices/totals';
+import { normalizeBelgianVat, normalizeEnterpriseNumber, parseAddress, peppolParticipantId, REDUCED_VAT_DECLARATION_NL, REDUCED_VAT_DECLARATION_VERSION } from '@/lib/invoices/constants';
+import { parseInvoiceLineItems } from '@/lib/invoices/form-lines';
 import { assertBelgianSellerIdentifiers } from '@/lib/invoices/validation';
 import { buildPeppolUbl } from '@/lib/invoices/ubl';
+import { invoiceableQuoteLines, quoteFamilyId, sameInvoiceCustomer } from '@/lib/invoices/quote-sources';
+import type { InvoiceSourceQuote } from '@/lib/invoices/quote-sources';
 import { renderInvoicePdf } from '@/lib/pdf/invoice-render';
-import type { Contractor, Invoice, InvoiceLineItem, InvoiceVatCategory, InvoiceVatRate } from '@/lib/supabase/types';
+import type { Contractor, Invoice, InvoiceLineItem } from '@/lib/supabase/types';
 
 function text(form: FormData, key: string, fallback = ''): string {
   return String(form.get(key) ?? fallback).trim();
@@ -42,7 +44,6 @@ function sellerSnapshot(contractor: Contractor) {
     email: contractor.email ?? '',
     phone: contractor.phone ?? '',
     legalForm: contractor.legal_form ?? '',
-    rpr: contractor.rpr ?? '',
     registrationNumber: contractor.registration_number ?? '',
     iban: contractor.iban ?? '',
     peppolId: peppolParticipantId(contractor.registration_number) ?? '',
@@ -60,30 +61,9 @@ function buyerSnapshot(form: FormData) {
     enterpriseNumber: normalizeEnterpriseNumber(nullable(form, 'customer_enterprise_number')) ?? '',
     email: text(form, 'customer_email'),
     phone: text(form, 'customer_phone'),
-    legalForm: '', rpr: '', registrationNumber: '', iban: '',
+    legalForm: '', registrationNumber: '', iban: '',
     peppolId: nullable(form, 'customer_peppol_id') ?? '',
   };
-}
-
-function parseLineItems(form: FormData, ids: string[], reverseCharge: boolean): Array<Record<string, unknown>> {
-  return ids.map((id, index) => {
-    const quantity = Number(text(form, `line_${id}_quantity`, '1'));
-    const price = Math.round(Number(text(form, `line_${id}_unit_price_euros`, '0')) * 100);
-    const unit = text(form, `line_${id}_unit`, 'stuk');
-    const unitCode = normalizeUnitCode(unit, nullable(form, `line_${id}_unit_code`));
-    const requestedRate = Number(text(form, `line_${id}_vat_rate`, '0.21')) as InvoiceVatRate;
-    const vatRate: InvoiceVatRate = reverseCharge ? 0 : (requestedRate === 0.06 ? 0.06 : 0.21);
-    const vatCategory: InvoiceVatCategory = reverseCharge ? 'AE' : 'S';
-    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('Elke factuurlijn heeft een geldig aantal nodig.');
-    if (!Number.isFinite(price) || price < 0) throw new Error('Elke factuurlijn heeft een geldige prijs nodig.');
-    if (!unitCode) throw new Error(`De eenheid van lijn ${index + 1} kan niet naar een Peppol-code worden vertaald.`);
-    return {
-      id,
-      description: text(form, `line_${id}_description`), quantity, unit, unit_code: unitCode,
-      unit_price_cents: price, vat_rate: vatRate, vat_category: vatCategory,
-      line_total_cents: invoiceLineTotalCents(quantity, price), sort_order: index,
-    };
-  });
 }
 
 function validateProfile(contractor: Contractor) {
@@ -96,7 +76,6 @@ function validateProfile(contractor: Contractor) {
     ['KBO-nummer', contractor.registration_number],
     ['IBAN', contractor.iban],
     ['rechtsvorm', contractor.legal_form],
-    ['RPR', contractor.rpr],
     ['facturatie-e-mail', contractor.email],
   ].filter(([, value]) => !value || !String(value).trim()).map(([label]) => label);
   if (missing.length) throw new Error(`Vul eerst je facturatieprofiel aan: ${missing.join(', ')}.`);
@@ -125,6 +104,12 @@ function invoiceErrorMessage(message: string | undefined, fallback: string): str
     due_date_required: 'Vul een vervaldatum in.',
     due_date_before_issue_date: 'De vervaldatum kan niet vóór de factuurdatum liggen.',
     invalid_invoice_line: 'Controleer de omschrijving, hoeveelheid, prijs, btw en Peppol-eenheid van elke lijn.',
+    invoice_quote_source_required: 'Selecteer minstens één aanvaarde offerte als factuurbron.',
+    accepted_quote_not_found: 'De geselecteerde aanvaarde offerte bestaat niet meer.',
+    invoice_quote_source_ineligible: 'Selecteer alleen aanvaarde offertes uit dezelfde offertefamilie.',
+    invoice_quote_customer_mismatch: 'De geselecteerde offertes hebben niet dezelfde klant.',
+    invoice_source_already_used: 'Een geselecteerde offerte is al aan een factuur gekoppeld.',
+    invoice_without_lines: 'Er zijn geen factureerbare lijnen. Voeg eerst prijzen en geldige btw toe.',
   };
   const key = Object.keys(messages).find((candidate) => message?.includes(candidate));
   return key ? messages[key] : (message || fallback);
@@ -142,46 +127,58 @@ async function loadInvoice(invoiceId: string) {
 
 export async function createInvoiceDraft(form: FormData): Promise<void> {
   const { supabase, contractor } = await requireContractor();
-  const quoteId = text(form, 'quote_id');
-  const [{ data: quote }, { data: sourceLines }] = await Promise.all([
-    supabase.from('quotes').select('*').eq('id', quoteId).eq('status', 'final').single(),
-    supabase.from('quote_line_items').select('*').eq('quote_id', quoteId).order('sort_order'),
+  const quoteIds = Array.from(new Set(form.getAll('quote_id').map((value) => String(value).trim()).filter(Boolean)));
+  if (quoteIds.length === 0) throw new Error('Selecteer minstens één aanvaarde offerte als factuurbron.');
+  const [{ data: quotes }, { data: sourceLines }] = await Promise.all([
+    supabase.from('quotes').select('*').in('id', quoteIds),
+    supabase.from('quote_line_items').select('*').in('quote_id', quoteIds).order('sort_order'),
   ]);
-  if (!quote) throw new Error('Alleen afgewerkte offertes kunnen worden gefactureerd.');
-  const { data: existing } = await supabase.from('invoices').select('id').eq('quote_id', quoteId).eq('document_type', 'invoice').maybeSingle();
-  if (existing) redirect(`/facturen/${existing.id}`);
+  const typedQuotes = (quotes ?? []) as InvoiceSourceQuote[];
+  if (typedQuotes.length !== quoteIds.length || typedQuotes.some((quote) => quote.status !== 'accepted')) {
+    throw new Error('Alleen aanvaarde offertes kunnen worden gefactureerd.');
+  }
+  const firstQuote = typedQuotes[0];
+  const familyId = quoteFamilyId(firstQuote);
+  if (typedQuotes.some((quote) => quoteFamilyId(quote) !== familyId || quote.contractor_id !== contractor.id)) {
+    throw new Error('Selecteer alleen aanvaarde offertes uit dezelfde offertefamilie.');
+  }
+  if (typedQuotes.some((quote) => !sameInvoiceCustomer(firstQuote, quote))) {
+    throw new Error('De geselecteerde offertes hebben niet dezelfde klant.');
+  }
 
-  const parsedAddress = parseAddress(String(quote.customer_address ?? ''));
-  const customerType = text(form, 'customer_type', 'private') === 'business' ? 'business' : 'private';
   const reverseCharge = bool(form, 'reverse_charge');
-  const lines = (sourceLines ?? []).map((line, index) => {
-    const unitCode = normalizeUnitCode(String(line.unit), line.unit_code);
-    if (!unitCode) throw new Error(`Eenheid “${line.unit}” ontbreekt. Kies een geldige eenheid in de factuur.`);
-    return {
-      description: String(line.description), quantity: Number(line.quantity), unit: String(line.unit), unit_code: unitCode,
-      unit_price_cents: Number(line.unit_price_cents ?? 0), vat_rate: reverseCharge ? 0 : Number(line.vat_rate ?? 0.21),
-      vat_category: reverseCharge ? 'AE' : 'S', line_total_cents: invoiceLineTotalCents(Number(line.quantity), Number(line.unit_price_cents ?? 0)), sort_order: index,
-    };
-  });
+  const sourceLineRows = (sourceLines ?? []) as Parameters<typeof invoiceableQuoteLines>[1];
+  const byQuote = new Map<string, typeof sourceLineRows>();
+  for (const line of sourceLineRows) byQuote.set(line.quote_id, [...(byQuote.get(line.quote_id) ?? []), line]);
+  const invoiceable = typedQuotes.flatMap((quote) => invoiceableQuoteLines(quote, byQuote.get(quote.id) ?? [], reverseCharge).lines);
+  if (invoiceable.length === 0) throw new Error('Er zijn geen factureerbare lijnen. Voeg eerst prijzen en geldige btw toe.');
+
+  const parsedAddress = parseAddress(String(firstQuote.customer_address ?? ''));
+  const customerType = text(form, 'customer_type', 'private') === 'business' ? 'business' : 'private';
   const customerVat = normalizeBelgianVat(nullable(form, 'customer_vat_number'));
   const enterprise = normalizeEnterpriseNumber(nullable(form, 'customer_enterprise_number'));
   const peppolId = customerType === 'business' ? peppolParticipantId(enterprise) : null;
   const draft = {
     customer_type: customerType,
-    customer_name: text(form, 'customer_name', quote.customer_name ?? ''), customer_address: text(form, 'customer_address', quote.customer_address ?? ''),
+    customer_name: text(form, 'customer_name', firstQuote.customer_name ?? ''), customer_address: text(form, 'customer_address', firstQuote.customer_address ?? ''),
     customer_street: text(form, 'customer_street', parsedAddress.street), customer_postal_code: text(form, 'customer_postal_code', parsedAddress.postalCode), customer_city: text(form, 'customer_city', parsedAddress.city), customer_country_code: text(form, 'customer_country_code', 'BE'),
-    customer_email: text(form, 'customer_email', quote.customer_email ?? '') || null, customer_phone: text(form, 'customer_phone', quote.customer_phone ?? '') || null,
+    customer_email: text(form, 'customer_email', firstQuote.customer_email ?? '') || null, customer_phone: text(form, 'customer_phone', firstQuote.customer_phone ?? '') || null,
     customer_vat_number: customerVat, customer_enterprise_number: enterprise, customer_peppol_id: peppolId,
-    seller_snapshot: sellerSnapshot(contractor), buyer_snapshot: { ...buyerSnapshot(form), name: text(form, 'customer_name', quote.customer_name ?? ''), street: text(form, 'customer_street', parsedAddress.street), postalCode: text(form, 'customer_postal_code', parsedAddress.postalCode), city: text(form, 'customer_city', parsedAddress.city), vatNumber: customerVat ?? '', enterpriseNumber: enterprise ?? '', peppolId: peppolId ?? '' },
+    seller_snapshot: sellerSnapshot(contractor), buyer_snapshot: { ...buyerSnapshot(form), name: text(form, 'customer_name', firstQuote.customer_name ?? ''), street: text(form, 'customer_street', parsedAddress.street), postalCode: text(form, 'customer_postal_code', parsedAddress.postalCode), city: text(form, 'customer_city', parsedAddress.city), vatNumber: customerVat ?? '', enterpriseNumber: enterprise ?? '', peppolId: peppolId ?? '' },
     issue_date: isoDate(text(form, 'issue_date')) ?? new Date().toISOString().slice(0, 10), delivery_date: isoDate(text(form, 'delivery_date')) ?? new Date().toISOString().slice(0, 10), due_date: isoDate(text(form, 'due_date')) ?? new Date(Date.now() + (contractor.default_payment_term_days ?? 30) * 86400000).toISOString().slice(0, 10),
     buyer_reference: text(form, 'buyer_reference'), vat_treatment: reverseCharge ? 'reverse_charge' : 'standard', reverse_charge_confirmed: reverseCharge,
     reduced_vat_confirmed: bool(form, 'reduced_vat_confirmed'), reduced_vat_declaration: bool(form, 'reduced_vat_confirmed') ? REDUCED_VAT_DECLARATION_NL : null,
     reduced_vat_declaration_version: bool(form, 'reduced_vat_confirmed') ? REDUCED_VAT_DECLARATION_VERSION : null,
     delivery_channel: customerType === 'business' ? 'peppol_manual' : 'email',
-    lines,
+    lines: invoiceable.map((line, index) => ({
+      description: line.description, quantity: line.quantity, unit: line.unit, unit_code: line.unitCode,
+      unit_price_cents: line.unitPriceCents, vat_rate: line.vatRate, vat_category: line.vatCategory,
+      line_total_cents: line.lineTotalCents, sort_order: index,
+      source_quote_id: line.sourceQuoteId, source_quote_line_item_id: line.id,
+    })),
   };
-  const { data: invoice, error } = await supabase.rpc('create_invoice_draft_from_quote', { p_quote_id: quoteId, p_draft: draft });
-  if (error || !invoice) throw new Error('Factuur aanmaken mislukt. Probeer opnieuw.');
+  const { data: invoice, error } = await supabase.rpc('create_invoice_draft_from_quotes', { p_quote_ids: quoteIds, p_draft: draft });
+  if (error || !invoice) throw new Error(invoiceErrorMessage(error?.message, 'Factuur aanmaken mislukt. Probeer opnieuw.'));
   redirect(`/facturen/${invoice.id}`);
 }
 
@@ -191,7 +188,7 @@ export async function updateInvoiceDraft(form: FormData): Promise<void> {
   if (invoice.status !== 'draft') throw new Error('Een uitgegeven factuur kan niet meer gewijzigd worden.');
   const customerType = text(form, 'customer_type', invoice.customer_type) === 'business' ? 'business' : 'private';
   const reverseCharge = bool(form, 'reverse_charge');
-  const lines = parseLineItems(form, oldLines.map((line) => line.id), reverseCharge);
+  const lines = parseInvoiceLineItems(form, oldLines.map((line) => line.id), reverseCharge);
   const enterprise = normalizeEnterpriseNumber(nullable(form, 'customer_enterprise_number'));
   const customerVat = normalizeBelgianVat(nullable(form, 'customer_vat_number'));
   const peppolId = customerType === 'business' ? peppolParticipantId(enterprise) : null;

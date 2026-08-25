@@ -10,7 +10,7 @@ await mkdir(output, { recursive: true });
 const seller = {
   name: 'Voorbeeld Bouw BV', street: 'Wetstraat 1', postalCode: '1000', city: 'Brussel', countryCode: 'BE',
   vatNumber: 'BE0563846944', enterpriseNumber: '0563846944', registrationNumber: '0563846944',
-  email: 'facturen@example.test', phone: '+3212345678', legalForm: 'BV', rpr: 'RPR Brussel', iban: 'BE68539007547034', peppolId: '0208:0563846944',
+  email: 'facturen@example.test', phone: '+3212345678', legalForm: 'BV', iban: 'BE68539007547034', peppolId: '0208:0563846944',
 };
 const buyer = { ...seller, name: 'Voorbeeld Klant BV', street: 'Kerkstraat 2', postalCode: '9000', city: 'Gent' };
 
@@ -34,7 +34,7 @@ function invoice(overrides: Partial<Invoice> = {}): Invoice {
 }
 
 function line(id: string, cents: number, rate: 0 | 0.06 | 0.21, category: 'S' | 'AE' = 'S'): InvoiceLineItem {
-  return { id, invoice_id: '11111111-1111-4111-8111-111111111111', description: `Voorbeeldwerk ${id}`, quantity: 1, unit: 'stuk', unit_code: 'C62', unit_price_cents: cents, vat_rate: rate, vat_category: category, line_total_cents: cents, sort_order: Number(id), created_at: '2026-08-18T10:00:00Z' };
+  return { id, invoice_id: '11111111-1111-4111-8111-111111111111', source_quote_id: null, source_quote_line_item_id: null, description: `Voorbeeldwerk ${id}`, quantity: 1, unit: 'stuk', unit_code: 'C62', unit_price_cents: cents, vat_rate: rate, vat_category: category, line_total_cents: cents, sort_order: Number(id), created_at: '2026-08-18T10:00:00Z' };
 }
 
 const cases: Array<{ name: string; invoice: Invoice; lines: InvoiceLineItem[] }> = [

@@ -36,7 +36,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         <p className="eyebrow">Klant</p>
         <h1 className="page-title">{customer.name}</h1>
         <p className="page-subtitle">
-          {customer.quoteCount} {customer.quoteCount === 1 ? 'offerte' : 'offertes'} · {formatEuros(customer.totalCents)} in totaal
+          {customer.quoteCount} {customer.quoteCount === 1 ? 'offerte' : 'offertes'} · {customer.totalCents === null ? 'Onbekend' : formatEuros(customer.totalCents)} in totaal
         </p>
       </header>
 

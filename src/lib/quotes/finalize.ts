@@ -7,7 +7,8 @@ export type FinalizeDeps = {
   loadClarifications: (quoteId: string) => Promise<QuoteClarification[]>;
   updateStatusToFinal: (quoteId: string) => Promise<void>;
   loadContractor: (contractorId: string) => Promise<Contractor | null>;
-  renderPdf: (input: { contractor: Contractor; quote: Quote; lineItems: QuoteLineItem[] }) => Promise<Uint8Array>;
+  loadParentQuoteNumber?: (parentQuoteId: string) => Promise<string | null>;
+  renderPdf: (input: { contractor: Contractor; quote: Quote; lineItems: QuoteLineItem[]; originalQuoteNumber?: string | null }) => Promise<Uint8Array>;
   uploadPdf: (path: string, pdf: Uint8Array) => Promise<void>;
   savePdfPath: (quoteId: string, path: string) => Promise<void>;
   log: (event: {
@@ -52,10 +53,14 @@ export async function finalizeQuote(deps: FinalizeDeps, quoteId: string): Promis
     const contractor = await deps.loadContractor(quote.contractor_id);
     if (!contractor) throw new Error('Contractor niet gevonden');
 
+    const originalQuoteNumber = quote.parent_quote_id && deps.loadParentQuoteNumber
+      ? await deps.loadParentQuoteNumber(quote.parent_quote_id)
+      : null;
     const pdf = await deps.renderPdf({
       contractor,
       quote: { ...quote, status: 'final' },
       lineItems,
+      originalQuoteNumber,
     });
 
     const path = `${quote.contractor_id}/${quoteId}.pdf`;

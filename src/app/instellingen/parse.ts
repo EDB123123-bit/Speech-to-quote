@@ -20,7 +20,6 @@ export function parseProfileInput(form: FormData) {
   return {
     ...base,
     legal_form: optional(form, 'legal_form'),
-    rpr: optional(form, 'rpr'),
     registration_number: optional(form, 'registration_number'),
     street: optional(form, 'street'),
     postal_code: optional(form, 'postal_code'),

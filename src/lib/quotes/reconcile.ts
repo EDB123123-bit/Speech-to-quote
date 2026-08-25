@@ -1,158 +1,33 @@
 import type { ExtractionResult } from '@/lib/ai/schemas';
-import type { CatalogItem } from '@/lib/supabase/types';
+import type { LineClassification } from '@/lib/supabase/types';
+import { filterPriceClarifications } from './clarifications';
 
-const STOP_WORDS = new Set([
-  'arbeid', 'leggen', 'plaatsen', 'per', 'stuk', 'uur', 'meter', 'vierkante',
-  'materiaal', 'vervangen', 'herstellen', 'maken', 'zetten', 'monteren',
-]);
-
-const NUMBER_WORDS: Record<string, number> = {
-  een: 1, twee: 2, drie: 3, vier: 4, vijf: 5, zes: 6, zeven: 7, acht: 8, negen: 9,
-  tien: 10, elf: 11, twaalf: 12, dertien: 13, veertien: 14, vijftien: 15,
-  zestien: 16, zeventien: 17, achttien: 18, negentien: 19, twintig: 20,
-  dertig: 30, veertig: 40, vijftig: 50, zestig: 60, zeventig: 70,
-  tachtig: 80, negentig: 90, honderd: 100,
+type ReconcileInput = {
+  tasks: Array<{ description: string; quantity: number | null; unit: string | null; unitPriceCents?: number | null; priceExplicit?: boolean; classification?: Exclude<LineClassification, 'unclassified'>; catalogItemId?: string | null }>;
+  clarifications: Array<{ questionNl: string }>;
 };
 
-function normalize(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9²]+/g, ' ')
-    .trim();
-}
+/**
+ * Normalizes model output without consulting a catalogue. Missing prices and
+ * missing dimensions remain missing; they are valid draft-quote states.
+ */
+export function reconcileExtraction(transcript: string, extraction: ReconcileInput, _legacyCatalog?: unknown): ExtractionResult {
+  void _legacyCatalog;
+  const tasks = extraction.tasks
+    .map((task) => ({
+      ...task,
+      description: task.description.trim(),
+      quantity: task.quantity !== null && task.quantity > 0 ? task.quantity : null,
+      unit: task.unit?.trim() || null,
+      unitPriceCents: task.priceExplicit === true && task.unitPriceCents !== null && task.unitPriceCents !== undefined && task.unitPriceCents >= 0
+        ? task.unitPriceCents
+        : null,
+      priceExplicit: task.priceExplicit === true,
+      classification: task.classification ?? 'labor_service',
+    }))
+    .filter((task) => task.description.length > 0);
 
-function significantTerms(name: string): string[] {
-  return normalize(name)
-    .split(/\s+/)
-    .filter((term) => term.length >= 4 && !STOP_WORDS.has(term));
-}
-
-function editDistance(left: string, right: string): number {
-  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
-    let diagonal = row[0];
-    row[0] = leftIndex;
-    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
-      const above = row[rightIndex];
-      row[rightIndex] = left[leftIndex - 1] === right[rightIndex - 1]
-        ? diagonal
-        : Math.min(diagonal + 1, row[rightIndex] + 1, row[rightIndex - 1] + 1);
-      diagonal = above;
-    }
-  }
-  return row[right.length];
-}
-
-function termsMatch(catalogTerm: string, spokenTerm: string): boolean {
-  if (catalogTerm === spokenTerm) return true;
-  // Short words are too ambiguous for fuzzy matching. For longer trade terms,
-  // one or two ASR spelling errors ("dakpannen" → "dekpannen") are safe to
-  // recover without asking the model to guess a price.
-  if (catalogTerm.length < 5 || spokenTerm.length < 5) return false;
-  const maxDistance = Math.max(1, Math.floor(Math.min(catalogTerm.length, spokenTerm.length) * 0.2));
-  return editDistance(catalogTerm, spokenTerm) <= maxDistance;
-}
-
-function findTermInText(text: string, term: string): { term: string; index: number } | null {
-  const exactIndex = text.indexOf(term);
-  if (exactIndex >= 0) return { term, index: exactIndex };
-
-  for (const match of text.matchAll(/[a-z0-9²]+/g)) {
-    const spokenTerm = match[0];
-    if (termsMatch(term, spokenTerm)) {
-      return { term: spokenTerm, index: match.index ?? 0 };
-    }
-  }
-  return null;
-}
-
-function findCatalogMention(transcript: string, item: CatalogItem): { term: string; index: number } | null {
-  const text = normalize(transcript);
-  for (const term of significantTerms(item.name)) {
-    const mention = findTermInText(text, term);
-    if (mention) return mention;
-  }
-  return null;
-}
-
-function findCatalogMatch(description: string, catalog: CatalogItem[]): CatalogItem | undefined {
-  const text = normalize(description);
-  return catalog.find((item) => significantTerms(item.name).some((term) => findTermInText(text, term)));
-}
-
-function nearbyQuantity(transcript: string, mention: { term: string; index: number }): number | null {
-  const text = normalize(transcript);
-  const start = Math.max(0, mention.index - 100);
-  const end = Math.min(text.length, mention.index + mention.term.length + 20);
-  const window = text.slice(start, end);
-  const mentionInWindow = mention.index - start;
-  const candidates: Array<{ value: number; distance: number }> = [];
-
-  for (const match of window.matchAll(/\b\d+(?:[.,]\d+)?\b/g)) {
-    candidates.push({
-      value: Number(match[0].replace(',', '.')),
-      distance: Math.abs((match.index ?? 0) + match[0].length - mentionInWindow),
-    });
-  }
-
-  for (const match of window.matchAll(/\b[a-z]+\b/g)) {
-    const value = NUMBER_WORDS[match[0]];
-    if (value !== undefined) {
-      candidates.push({
-        value,
-        distance: Math.abs((match.index ?? 0) + match[0].length - mentionInWindow),
-      });
-    }
-  }
-
-  candidates.sort((a, b) => a.distance - b.distance);
-  return candidates[0]?.value && candidates[0].value > 0 ? candidates[0].value : null;
-}
-
-function hasClarification(questions: { questionNl: string }[], question: string): boolean {
-  return questions.some((item) => item.questionNl.trim().toLowerCase() === question.trim().toLowerCase());
-}
-
-/** Protects quote generation from a valid but incomplete model response. */
-export function reconcileExtraction(
-  transcript: string,
-  extraction: ExtractionResult,
-  catalog: CatalogItem[],
-): ExtractionResult {
-  const tasks = extraction.tasks.map((task) => {
-    const explicit = task.catalogItemId
-      ? catalog.find((item) => item.id === task.catalogItemId)
-      : undefined;
-    const inferred = explicit ?? findCatalogMatch(task.description, catalog);
-    return inferred
-      ? { ...task, catalogItemId: inferred.id, unit: inferred.unit }
-      : task;
-  });
-
-  const clarificationQuestions = [...extraction.clarifications];
-  const matchedIds = new Set(tasks.flatMap((task) => task.catalogItemId ? [task.catalogItemId] : []));
-
-  for (const item of catalog) {
-    if (matchedIds.has(item.id)) continue;
-
-    const mention = findCatalogMention(transcript, item);
-    if (!mention) continue;
-
-    const quantity = nearbyQuantity(transcript, mention);
-    if (quantity !== null) {
-      tasks.push({ catalogItemId: item.id, description: item.name, quantity, unit: item.unit });
-      matchedIds.add(item.id);
-      continue;
-    }
-
-    const question = `Hoeveel ${item.name} moet ik opnemen?`;
-    if (!hasClarification(clarificationQuestions, question)) {
-      clarificationQuestions.push({ questionNl: question });
-    }
-  }
-
+  const clarificationQuestions = filterPriceClarifications(extraction.clarifications);
   if (tasks.length === 0 && clarificationQuestions.length === 0 && transcript.trim() !== '') {
     clarificationQuestions.push({
       questionNl: 'Welke werken of materialen moet ik op deze offerte zetten?',

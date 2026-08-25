@@ -1,110 +1,21 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { expandTasksToLineItems } from '@/lib/quotes/expand';
-import type { CatalogItem } from '@/lib/supabase/types';
-
-const tiles: CatalogItem = {
-  id: 'cat-1',
-  contractor_id: 'contractor-1',
-  name: 'Dakpannen leggen (kleitegels)',
-  unit: 'm²',
-  materials_price_cents: 3000,
-  labor_price_cents: 1500,
-  vat_rate: 0.06,
-  created_at: '2026-08-06T00:00:00Z',
-};
 
 describe('expandTasksToLineItems', () => {
-  it('expands a matched task into a materials row and a labor row', () => {
-    const rows = expandTasksToLineItems(
-      [{ catalogItemId: 'cat-1', description: 'Dakpannen leggen', quantity: 80, unit: 'm²' }],
-      [tiles],
-    );
-
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatchObject({
-      catalog_item_id: 'cat-1',
-      description: 'Dakpannen leggen (kleitegels) – materiaal',
-      quantity: 80,
-      unit: 'm²',
-      unit_price_cents: 3000,
-      vat_rate: 0.06,
-      line_type: 'materials',
-    });
-    expect(rows[1]).toMatchObject({
-      catalog_item_id: 'cat-1',
-      description: 'Dakpannen leggen (kleitegels) – arbeid',
-      unit_price_cents: 1500,
-      vat_rate: 0.06,
-      line_type: 'labor',
-    });
-  });
-
-  it('copies prices from the catalog so later catalog edits do not change the quote', () => {
-    const rows = expandTasksToLineItems(
-      [{ catalogItemId: 'cat-1', description: 'x', quantity: 1, unit: 'm²' }],
-      [tiles],
-    );
-    expect(rows[0].unit_price_cents).toBe(tiles.materials_price_cents);
-    expect(rows[1].unit_price_cents).toBe(tiles.labor_price_cents);
-  });
-
-  it('expands an unmatched task into two empty rows for the contractor to price', () => {
-    const rows = expandTasksToLineItems(
-      [{ catalogItemId: null, description: 'Zinken dakgoot vervangen', quantity: 12, unit: 'm' }],
-      [tiles],
-    );
-
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatchObject({
-      catalog_item_id: null,
-      description: 'Zinken dakgoot vervangen – materiaal',
-      quantity: 12,
-      unit: 'm',
-      unit_price_cents: null,
-      vat_rate: null,
-      line_type: 'materials',
-    });
-    expect(rows[1].line_type).toBe('labor');
-    expect(rows[1].unit_price_cents).toBeNull();
-  });
-
-  it('treats a catalogItemId that is not in the catalog as unmatched', () => {
-    const rows = expandTasksToLineItems(
-      [{ catalogItemId: 'does-not-exist', description: 'Iets', quantity: 1, unit: 'stuk' }],
-      [tiles],
-    );
-    expect(rows[0].catalog_item_id).toBeNull();
-    expect(rows[0].unit_price_cents).toBeNull();
-  });
-
-  it('assigns increasing sort_order so rows keep a stable display sequence', () => {
-    const rows = expandTasksToLineItems(
-      [
-        { catalogItemId: 'cat-1', description: 'A', quantity: 1, unit: 'm²' },
-        { catalogItemId: null, description: 'B', quantity: 2, unit: 'm' },
-      ],
-      [tiles],
-    );
-    expect(rows.map((r) => r.sort_order)).toEqual([0, 1, 2, 3]);
-  });
-
-  it('returns nothing for no tasks', () => {
-    expect(expandTasksToLineItems([], [tiles])).toEqual([]);
-  });
-
-  it('keeps an approved combined catalogue price as one truthful line', () => {
-    const combined: CatalogItem = {
-      ...tiles,
-      pricing_mode: 'combined',
-      materials_price_cents: null,
-      labor_price_cents: null,
-      combined_price_cents: 5250,
-    };
-    const rows = expandTasksToLineItems(
-      [{ catalogItemId: combined.id, description: combined.name, quantity: 2, unit: combined.unit }],
-      [combined],
-    );
+  it('creates one catalogue-independent truthful line per task', () => {
+    const rows = expandTasksToLineItems([{ description: 'Dakpannen leggen', quantity: 80, unit: 'm²', unitPriceCents: null, priceExplicit: false, classification: 'material' }]);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ line_type: 'combined', description: combined.name, unit_price_cents: 5250 });
+    expect(rows[0]).toMatchObject({ catalog_item_id: null, classification: 'material', line_type: 'materials', quantity: 80, unit: 'm²', unit_price_cents: null, price_source: 'unknown', line_kind: 'detailed' });
+  });
+
+  it('keeps an explicit zero price and simple lines truthful', () => {
+    const rows = expandTasksToLineItems([{ description: 'Inspectie', quantity: null, unit: null, unitPriceCents: 0, priceExplicit: true, classification: 'labor_service' }]);
+    expect(rows[0]).toMatchObject({ unit_price_cents: 0, line_type: 'labor', line_kind: 'simple', price_source: 'explicit', quantity: null, unit: null });
+  });
+
+  it('never consults a legacy catalogue argument', () => {
+    const rows = expandTasksToLineItems([{ description: 'Werk', quantity: 1, unit: 'stuk', classification: 'labor_service', unitPriceCents: null, priceExplicit: false }], [{ id: 'legacy', materials_price_cents: 999999 }]);
+    expect(rows[0].unit_price_cents).toBeNull();
+    expect(rows[0].catalog_item_id).toBeNull();
   });
 });

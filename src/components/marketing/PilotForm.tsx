@@ -51,7 +51,7 @@ export default function PilotForm() {
       <div className="lp-form-card lp-form-done" role="status" aria-live="polite">
         <span className="lp-done-icon"><Icon name="check" size={28} /></span>
         <h3>{state.firstName ? `Bedankt, ${state.firstName}.` : 'Bedankt.'} Je aanvraag is binnen.</h3>
-        <p>Edouard belt je zo snel mogelijk terug om de pilot samen op te starten.</p>
+        <p>Pieter belt je zo snel mogelijk terug om de pilot samen op te starten.</p>
         <a className="btn btn-outline lp-whatsapp" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
           <WhatsAppIcon /> Liever meteen een WhatsApp
         </a>
@@ -120,7 +120,7 @@ export default function PilotForm() {
       {state.status === 'failed' && (
         <div role="alert" className="alert alert-critical lp-form-alert">
           <p>
-            Je aanvraag kon niet verstuurd worden. Probeer het opnieuw, of stuur Edouard meteen een{' '}
+            Je aanvraag kon niet verstuurd worden. Probeer het opnieuw, of stuur Pieter meteen een{' '}
             <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">WhatsApp</a>.
           </p>
         </div>

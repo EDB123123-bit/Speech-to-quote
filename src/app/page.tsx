@@ -123,7 +123,7 @@ export default function HomePage() {
                 <div className="lp-cta-row">
                   <a href="#pilot" className="btn btn-primary lp-cta">Word pilotklant</a>
                   <a href={WHATSAPP_URL} className="lp-text-link" target="_blank" rel="noopener noreferrer">
-                    <WhatsAppIcon /> WhatsApp Edouard
+                    <WhatsAppIcon /> WhatsApp Pieter
                   </a>
                 </div>
               </div>
@@ -214,7 +214,7 @@ export default function HomePage() {
               <ul className="lp-perks">
                 <li><Icon name="check" size={20} /> Tijdens de pilot gebruik je Werkoffertes gratis.</li>
                 <li><Icon name="check" size={20} /> We zetten je account samen op, met je bedrijfsgegevens en je mailbox.</li>
-                <li><Icon name="check" size={20} /> Je hebt een rechtstreekse lijn met Edouard, ook via WhatsApp.</li>
+                <li><Icon name="check" size={20} /> Je hebt een rechtstreekse lijn met Pieter, ook via WhatsApp.</li>
               </ul>
               <figure className="lp-founder">
                 <blockquote>
@@ -224,11 +224,11 @@ export default function HomePage() {
                 </blockquote>
                 <figcaption>
                   <span className="lp-founder-mark" aria-hidden="true">E</span>
-                  <span><strong>Edouard</strong> Oprichter van Werkoffertes</span>
+                  <span><strong>Pieter</strong> Oprichter van Werkoffertes</span>
                 </figcaption>
               </figure>
               <a href={WHATSAPP_URL} className="btn btn-outline lp-whatsapp" target="_blank" rel="noopener noreferrer">
-                <WhatsAppIcon /> WhatsApp Edouard
+                <WhatsAppIcon /> WhatsApp Pieter
               </a>
             </div>
             <PilotForm />

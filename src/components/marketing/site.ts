@@ -3,7 +3,7 @@ export const PILOT_PHONE_DISPLAY = '+32 479 87 08 89';
 export const PILOT_PHONE_E164 = '+32479870889';
 
 export const WHATSAPP_URL = `https://wa.me/${PILOT_PHONE_E164.slice(1)}?text=${encodeURIComponent(
-  'Hallo Edouard, ik heb interesse in de pilot van Werkoffertes.',
+  'Hallo Pieter, ik heb interesse in de pilot van Werkoffertes.',
 )}`;
 
 export const SITE_URL = (process.env.APP_URL?.trim() || 'https://speech-to-quote-mu.vercel.app').replace(/\/$/, '');

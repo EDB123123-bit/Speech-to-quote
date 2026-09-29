@@ -68,7 +68,8 @@ export const ONBOARDING_STEPS: Step[] = [
 type Rect = { top: number; left: number; width: number; height: number };
 
 function isInternalPath(pathname: string): boolean {
-  return pathname !== '/login'
+  return pathname !== '/'
+    && pathname !== '/login'
     && !pathname.startsWith('/auth/')
     && !pathname.startsWith('/offerte/');
 }

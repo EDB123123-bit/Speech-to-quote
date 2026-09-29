@@ -106,6 +106,17 @@ describe('OnboardingTour', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('does not query or show contractor onboarding on the marketing home page', async () => {
+    mocks.pathname = '/';
+    window.history.replaceState({}, '', '/');
+
+    render(<OnboardingTour />);
+    await act(async () => Promise.resolve());
+
+    expect(mocks.getOnboardingStatus).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('responds to the shared restart event', async () => {
     mocks.getOnboardingStatus.mockResolvedValue({ show: false });
     render(<OnboardingTour />);

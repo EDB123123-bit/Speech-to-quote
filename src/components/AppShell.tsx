@@ -47,7 +47,7 @@ const TOUR_TARGETS: Partial<Record<string, string>> = {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname === '/login' || pathname.startsWith('/auth/') || pathname.startsWith('/offerte/')) return children;
+  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/auth/') || pathname.startsWith('/offerte/')) return children;
 
   return (
     <div className="app-shell">

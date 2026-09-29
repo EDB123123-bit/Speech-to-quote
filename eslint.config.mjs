@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     ".claude/**",
     ".cache/**",
+    // Separate Remotion project with its own dependencies.
+    "marketing/**",
   ]),
 ]);
 

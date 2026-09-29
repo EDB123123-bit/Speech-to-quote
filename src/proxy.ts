@@ -1,8 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+/** The marketing home page. Only the exact root, never a prefix. */
+export function isMarketingPath(pathname: string): boolean {
+  return pathname === '/';
+}
+
 export function isPublicPath(pathname: string): boolean {
   return (
+    isMarketingPath(pathname) ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/auth') ||
     // Customer acceptance is token-authenticated and must not require a
@@ -46,8 +52,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
   // A contractor may open the same tokenized customer page for support or
-  // verification. Only authentication entry pages redirect signed-in users.
-  if (data.user && isAuthEntryPath(pathname)) {
+  // verification. Only authentication entry pages and the marketing home
+  // redirect signed-in users, so the root keeps opening their quotes.
+  if (data.user && (isAuthEntryPath(pathname) || isMarketingPath(pathname))) {
     return NextResponse.redirect(new URL('/offertes', request.url));
   }
 
@@ -55,5 +62,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/cron).*)'],
+  // Marketing assets (video, poster, social image) and Vercel's analytics
+  // script must load for logged-out visitors and link-preview crawlers, so
+  // they skip the session check.
+  matcher: ['/((?!_next/static|_next/image|_vercel/|favicon.ico|api/cron|marketing/).*)'],
 };

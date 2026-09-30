@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { isAppAdmin } from '@/lib/admin/require-admin';
 import { requireContractor } from '@/lib/auth/require-contractor';
 import { getMailboxSummary } from '@/lib/mailbox/connection';
 import CatalogForm from '@/components/CatalogForm';
@@ -26,12 +28,13 @@ type Props = {
 
 export default async function SettingsPage({ searchParams }: Props) {
   const { supabase, contractor } = await requireContractor();
-  const [{ data: catalogItems }, { data: stages }, { data: catalogSuggestions }, mailbox, params] = await Promise.all([
+  const [{ data: catalogItems }, { data: stages }, { data: catalogSuggestions }, mailbox, params, isAdmin] = await Promise.all([
     supabase.from('catalog_items').select('*').order('name', { ascending: true }),
     supabase.from('pipeline_stages').select('*').order('sort_order', { ascending: true }),
     supabase.from('catalog_price_suggestions').select('*').eq('status', 'pending').order('updated_at', { ascending: false }),
     getMailboxSummary(contractor.id),
     searchParams,
+    isAppAdmin(contractor.id),
   ]);
   const mailboxError = params.mailbox_error
     ? MAILBOX_ERRORS[params.mailbox_error] ?? MAILBOX_ERRORS.unexpected
@@ -45,6 +48,7 @@ export default async function SettingsPage({ searchParams }: Props) {
           <h1 className="page-title">Instellingen</h1>
           <p className="page-subtitle">Je bedrijfsgegevens, prijzen en opvolging op één plek.</p>
         </div>
+        {isAdmin && <Link href="/beheer" className="btn btn-outline">Accounts en offertes</Link>}
       </header>
 
       <nav className="settings-nav" aria-label="Onderdelen van instellingen">

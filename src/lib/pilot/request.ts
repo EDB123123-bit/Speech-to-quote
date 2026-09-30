@@ -25,13 +25,13 @@ export type PilotParseResult =
 /** Campaign attribution the landing page may send along. Anything else is dropped. */
 const SOURCE_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'referrer'] as const;
 
-const REGION_LABELS: Record<PilotRegion, string> = {
+export const REGION_LABELS: Record<PilotRegion, string> = {
   vlaanderen: 'Vlaanderen of Brussel',
   nederland: 'Nederland',
   elders: 'Elders',
 };
 
-const VOLUME_LABELS: Record<PilotQuoteVolume, string> = {
+export const VOLUME_LABELS: Record<PilotQuoteVolume, string> = {
   'minder-dan-10': 'minder dan 10 offertes per maand',
   '10-30': '10 tot 30 offertes per maand',
   'meer-dan-30': 'meer dan 30 offertes per maand',

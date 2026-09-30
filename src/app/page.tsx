@@ -102,8 +102,8 @@ export default function HomePage() {
           <nav className="lp-nav-links" aria-label="Pagina">
             <a href="#hoe-het-werkt">Hoe het werkt</a>
             <a href="#vragen">Vragen</a>
-            <Link href="/login">Inloggen</Link>
           </nav>
+          <Link href="/login" className="lp-nav-login">Inloggen</Link>
           <a href="#pilot" className="btn btn-primary lp-nav-cta">Word pilotklant</a>
         </div>
       </header>

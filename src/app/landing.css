@@ -43,11 +43,28 @@
 .lp-nav-inner { display: flex; min-height: 68px; align-items: center; gap: 1.5rem; }
 .lp-nav .brand-mark { margin-right: auto; }
 .lp-nav-links { display: none; gap: 0.25rem; }
-.lp-nav-links a { display: inline-flex; min-height: 44px; align-items: center; padding: 0 0.85rem; border-radius: 12px; color: var(--muted); font-weight: 700; text-decoration: none; transition: color 150ms ease, background-color 150ms ease; }
+.lp-nav-links a,
+.lp-nav-login { display: inline-flex; min-height: 44px; align-items: center; padding: 0 0.85rem; border-radius: 12px; color: var(--muted); font-weight: 700; text-decoration: none; transition: color 150ms ease, background-color 150ms ease; }
+/* Login stays visible on every screen size: it is the way back in for existing users. */
+.lp-nav-login { padding: 0 0.6rem; color: var(--ink); font-weight: 800; }
 .lp-nav-cta { min-height: 44px; padding: 0.55rem 1.05rem; border-radius: 14px; font-size: 0.95rem; white-space: nowrap; }
 
 @media (hover: hover) and (pointer: fine) {
-  .lp-nav-links a:hover { background: var(--paper-strong); color: var(--ink); }
+  .lp-nav-links a:hover,
+  .lp-nav-login:hover { background: var(--paper-strong); color: var(--ink); }
+}
+
+/* Phones: brand, login and the pilot button share one line. */
+@media (max-width: 519px) {
+  .lp-nav-inner { gap: 0.35rem; }
+  .lp-nav .brand-mark { gap: 0.5rem; font-size: 0.95rem; }
+  .lp-nav .brand-icon { width: 32px; height: 32px; }
+  .lp-nav-login { padding: 0 0.45rem; font-size: 0.92rem; }
+  .lp-nav-cta { padding: 0.5rem 0.8rem; font-size: 0.88rem; }
+}
+/* Very small phones: the microphone mark alone stands for the brand. */
+@media (max-width: 389px) {
+  .lp-nav .brand-mark span:not(.brand-icon) { display: none; }
 }
 
 @media (prefers-reduced-transparency: reduce) {
